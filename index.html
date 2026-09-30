@@ -107,12 +107,12 @@ canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
 
 .tile{position:relative;display:flex;flex-direction:column;min-width:0;text-align:left;padding:0;overflow:hidden;border-radius:16px;
   background:linear-gradient(168deg,rgba(24,29,52,.95),rgba(10,13,26,.97));
-  border:1px solid rgba(242,237,227,.13);color:var(--paper);font-family:var(--font-b);cursor:pointer;
+  border:1px solid rgba(242,237,227,.13);color:var(--paper);font-family:var(--font-b);cursor:pointer;text-decoration:none;
   transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
 .tile:hover,.tile:focus-visible{transform:translateY(-3px);border-color:rgba(245,199,74,.55);box-shadow:0 16px 40px rgba(0,0,0,.45)}
 .tile:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
-.tshot{position:relative;display:block;width:100%;min-width:0}
-.tile .thumb{display:block;width:100%;aspect-ratio:16/9;max-width:100%;background:#0b0e1c;border-bottom:1px solid rgba(242,237,227,.1)}
+.tshot{position:relative;display:block;width:100%;min-width:0;aspect-ratio:16/9;overflow:hidden;border-bottom:1px solid rgba(242,237,227,.1)}
+.tile .thumb{display:block;position:absolute;inset:0;width:100%;height:100%;max-width:100%;background:#0b0e1c}
 .tcap{position:absolute;left:0;right:0;bottom:0;padding:26px 14px 10px;text-align:left;
   font-family:var(--font-d);font-weight:700;font-size:15px;line-height:1.16;letter-spacing:-.01em;color:var(--paper);
   text-shadow:0 2px 10px rgba(0,0,0,.85);text-wrap:balance;
@@ -147,7 +147,7 @@ canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
     <header class="mhead">
       <p class="eyebrow">Збірка ігор</p>
       <h1 class="mtitle">Технікал <em>Геймз</em></h1>
-      <p class="mlede">Маленькі браузерні ігри, які запускаються з одного файлу й не просять нічого встановлювати. Обери, у що бігти.</p>
+      <p class="mlede">Маленькі браузерні ігри, які не просять нічого встановлювати. Дві живуть просто тут, третя — окремою сторінкою з 3D. Обери, у що бігти.</p>
     </header>
     <div class="tiles" id="tiles"></div>
     <footer class="mfoot">Рекорди зберігаються у твоєму браузері й нікуди не надсилаються. Звук вмикається всередині гри.</footer>
@@ -184,6 +184,15 @@ var GAMES = [
     bestKey: 'karas2.best',
     create: createKaras2,
     thumb: thumbKaras2
+  },
+  {
+    id: 'karas3',
+    title: 'Кільце Карася',
+    href: 'karas3.html',
+    lede: 'Соулслайк у 3D. Прокидаєшся в темній каплиці з Жидіньким Мечем, виходиш у Міждуп\'я — а там під золотим карасем тебе вже чекають. Перекати, витривалість, вогнище й бос у печері.',
+    chips: ['Соулслайк', '3D', 'Окрема сторінка'],
+    bestKey: null,
+    thumb: thumbKaras3
   }
 ];
 
@@ -206,8 +215,10 @@ function esc(t){ return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').r
 function renderTiles(){
   var html = '';
   GAMES.forEach(function(gm){
-    var tag = gm.soon ? 'div' : 'button';
-    var attrs = gm.soon ? ' class="tile soon"' : ' class="tile" type="button" data-id="' + gm.id + '"';
+    var tag = gm.soon ? 'div' : (gm.href ? 'a' : 'button');
+    var attrs = gm.soon ? ' class="tile soon"'
+      : (gm.href ? ' class="tile" href="' + gm.href + '"'
+                 : ' class="tile" type="button" data-id="' + gm.id + '"');
     var b = bestOf(gm.bestKey);
     html += '<' + tag + attrs + '>' +
       '<div class="tshot">' +
@@ -232,7 +243,7 @@ function renderTiles(){
     if (c) thumbs.push({ el: c, ctx: c.getContext('2d'), draw: gm.thumb });
   });
 
-  Array.prototype.forEach.call(elTiles.querySelectorAll('.tile[data-id]'), function(btn){
+  Array.prototype.forEach.call(elTiles.querySelectorAll('button.tile[data-id]'), function(btn){
     btn.addEventListener('click', function(){ openGame(btn.getAttribute('data-id')); });
   });
 }
@@ -404,6 +415,82 @@ function thumbKaras(c, w, h, t){
   c.fillStyle = '#14161f';
   c.beginPath(); c.arc(0.275 * u, -0.12 * u, 0.042 * u, 0, 6.2832); c.fill();
   c.restore();
+}
+
+function thumbKaras3(c, w, h, t){
+  var hz = h * 0.56;
+  var sky = c.createLinearGradient(0, 0, 0, hz);
+  sky.addColorStop(0, '#0b0e18'); sky.addColorStop(0.7, '#1d2130'); sky.addColorStop(1, '#3a3b42');
+  c.fillStyle = sky; c.fillRect(0, 0, w, hz);
+
+  // золотий карась на обрії
+  var gx = w * 0.30, gy = hz * 0.42, gs = Math.min(w, h) * 0.017;
+  var glow = c.createRadialGradient(gx, gy, gs, gx, gy, gs * 13);
+  glow.addColorStop(0, 'rgba(240,206,120,0.42)');
+  glow.addColorStop(1, 'rgba(240,206,120,0)');
+  c.fillStyle = glow;
+  c.beginPath(); c.arc(gx, gy, gs * 13, 0, 6.2832); c.fill();
+  c.save();
+  c.translate(gx, gy + Math.sin(t * 0.7) * gs * 0.5);
+  c.fillStyle = '#e6c463';
+  c.beginPath(); c.ellipse(0, 0, gs * 6.4, gs * 2.9, 0.06, 0, 6.2832); c.fill();
+  c.beginPath();
+  c.moveTo(-gs * 5.4, 0); c.lineTo(-gs * 9.6, -gs * 3.2);
+  c.quadraticCurveTo(-gs * 7.4, 0, -gs * 9.6, gs * 3.2);
+  c.closePath(); c.fill();
+  c.fillStyle = '#f5e2a6';
+  c.beginPath(); c.ellipse(gs * 4.6, -gs * 0.3, gs * 2.2, gs * 2.0, 0, 0, 6.2832); c.fill();
+  c.fillStyle = '#2a1e06';
+  c.beginPath(); c.arc(gs * 5.4, -gs * 0.7, gs * 0.5, 0, 6.2832); c.fill();
+  c.fillStyle = 'rgba(138,107,34,0.7)';
+  for (var q = 0; q < 3; q++) {
+    c.beginPath(); c.arc(-gs * (0.6 + q * 1.7), 0, gs * 1.9, -1.1, 1.1); c.stroke();
+  }
+  c.restore();
+
+  // хребет і скелі
+  c.fillStyle = '#161922';
+  c.beginPath(); c.moveTo(0, hz);
+  for (var i = 0; i <= 10; i++) {
+    c.lineTo(i * w / 10, hz - (10 + Math.sin(i * 1.7) * 9 + Math.cos(i * 0.8) * 7));
+  }
+  c.lineTo(w, hz); c.closePath(); c.fill();
+
+  // земля
+  var gr = c.createLinearGradient(0, hz, 0, h);
+  gr.addColorStop(0, '#2b2a20'); gr.addColorStop(1, '#17170f');
+  c.fillStyle = gr; c.fillRect(0, hz - 1, w, h - hz + 1);
+
+  // надгробки
+  c.fillStyle = '#20222b';
+  [0.12, 0.2, 0.78, 0.88, 0.68].forEach(function(k, i){
+    var sx = k * w, sy = hz + (h - hz) * (0.12 + (i % 3) * 0.14);
+    var sh = (h - hz) * (0.14 + (i % 2) * 0.06);
+    c.fillRect(sx, sy - sh, sh * 0.42, sh);
+  });
+
+  // герой із мечем
+  var px = w * 0.52, py = h * 0.88, u = (h - hz) * 0.42;
+  c.save(); c.translate(px, py);
+  c.strokeStyle = '#141610'; c.lineWidth = u * 0.15; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(-u * 0.14, 0); c.lineTo(-u * 0.14, -u * 0.45);
+  c.moveTo(u * 0.14, 0); c.lineTo(u * 0.14, -u * 0.45); c.stroke();
+  c.fillStyle = '#1b1e16';
+  c.beginPath(); c.ellipse(0, -u * 0.78, u * 0.32, u * 0.42, 0, 0, 6.2832); c.fill();
+  c.fillStyle = '#2a2c22';
+  c.beginPath(); c.arc(0, -u * 1.18, u * 0.19, 0, 6.2832); c.fill();
+  // Жидінький Меч провисає
+  c.strokeStyle = '#c9a469'; c.lineWidth = u * 0.11; c.lineJoin = 'round';
+  c.beginPath();
+  c.moveTo(u * 0.3, -u * 0.72);
+  c.quadraticCurveTo(u * 0.95, -u * 0.5 + Math.sin(t * 2.4) * u * 0.1, u * 1.25, -u * 0.05 + Math.sin(t * 2.4) * u * 0.16);
+  c.stroke();
+  c.restore();
+
+  // серпанок
+  var fg = c.createLinearGradient(0, hz - 8, 0, hz + (h - hz) * 0.3);
+  fg.addColorStop(0, 'rgba(58,59,66,0.75)'); fg.addColorStop(1, 'rgba(58,59,66,0)');
+  c.fillStyle = fg; c.fillRect(0, hz - 8, w, (h - hz) * 0.35);
 }
 
 function thumbSoon(c, w, h, t){
