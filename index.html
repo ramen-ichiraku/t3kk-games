@@ -158,13 +158,13 @@ canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
 (function(){
 'use strict';
 
-var KARAS_TPL = "<canvas id=\"cv\"></canvas>\n\n  <div id=\"hud\">\n    <div class=\"bar\">\n      <div class=\"stat\"><span class=\"lbl\">Монети</span><span class=\"val\" id=\"vCoins\">0</span></div>\n      <div class=\"stat mid\"><span class=\"lbl\">Метрів</span><span class=\"val big\" id=\"vDist\">0</span></div>\n      <div class=\"stat\"><span class=\"lbl\">Рекорд</span><span class=\"val\" id=\"vBest\">0</span></div>\n    </div>\n    <div class=\"heat\"><span class=\"hlbl\">Бус</span><div class=\"track\"><div id=\"heatFill\"></div></div></div>\n    <div class=\"tools\">\n      <button id=\"bSound\" class=\"tbtn\" type=\"button\">Звук: вимк.</button>\n      <button id=\"bPause\" class=\"tbtn\" type=\"button\">Пауза</button>\n    </div>\n  </div>\n\n  <div id=\"overlay\">\n    <div class=\"card\" id=\"scrStart\">\n      <h1>Карась Тікає</h1>\n      <p class=\"tag\">Три ряди, монети під ногами і жодної причини зупинятися.</p>\n      <div class=\"keys\">\n        <b>← →</b><span>перебігти в сусідній ряд</span>\n        <b>↑ / Пробіл</b><span>стрибок через калюжу</span>\n        <b>↓</b><span>підкат під шлагбаум</span>\n        <b>Свайп</b><span>те саме на телефоні</span>\n      </div>\n      <button class=\"go\" id=\"bStart\" type=\"button\">Бігти</button>\n      <p class=\"note\">Бак зверху — наскільки близько бус. Зіткнення підпускає його ближче, монети й чистий біг відривають.</p>\n    </div>\n\n    <div class=\"card\" id=\"scrOver\" hidden>\n      <h2>Бус наздогнав</h2>\n      <p class=\"tag\" id=\"overLine\">Карась пішов на шашлик.</p>\n      <div class=\"res\">\n        <div><span class=\"lbl\">Метрів</span><span class=\"val\" id=\"rDist\">0</span></div>\n        <div><span class=\"lbl\">Монет</span><span class=\"val\" id=\"rCoins\">0</span></div>\n        <div><span class=\"lbl\">Рахунок</span><span class=\"val\" id=\"rScore\">0</span></div>\n      </div>\n      <button class=\"go\" id=\"bAgain\" type=\"button\">Ще раз</button>\n      <p class=\"note\" id=\"bestNote\"></p>\n    </div>\n\n    <div class=\"card\" id=\"scrPause\" hidden>\n      <h2 style=\"color:var(--gold)\">Пауза</h2>\n      <p class=\"tag\">Бус теж стоїть. Поки що.</p>\n      <button class=\"go\" id=\"bResume\" type=\"button\">Далі</button>\n    </div>\n  </div>";
+var KARAS_TPL = "<canvas id=\"cv\"></canvas>\n\n  <div id=\"hud\">\n    <div class=\"bar\">\n      <div class=\"stat\"><span class=\"lbl\">Монети</span><span class=\"val\" id=\"vCoins\">0</span></div>\n      <div class=\"stat mid\"><span class=\"lbl\">Метрів</span><span class=\"val big\" id=\"vDist\">0</span></div>\n      <div class=\"stat\"><span class=\"lbl\">Рекорд</span><span class=\"val\" id=\"vBest\">0</span></div>\n    </div>\n    <div class=\"heat\"><span class=\"hlbl\">Бус</span><div class=\"track\"><div id=\"heatFill\"></div></div></div>\n    <div class=\"tools\">\n      <button id=\"bSound\" class=\"tbtn\" type=\"button\">Звук: вимк.</button>\n      <button id=\"bPause\" class=\"tbtn\" type=\"button\">Пауза</button>\n    </div>\n  </div>\n\n  <div id=\"overlay\">\n    <div class=\"card\" id=\"scrStart\">\n      <h1>Гра в Карася 1</h1>\n      <p class=\"sub\">Втеча</p>\n      <p class=\"tag\">Три ряди, монети під ногами і жодної причини зупинятися.</p>\n      <div class=\"keys\">\n        <b>← →</b><span>перебігти в сусідній ряд</span>\n        <b>↑ / Пробіл</b><span>стрибок через калюжу</span>\n        <b>↓</b><span>підкат під шлагбаум</span>\n        <b>Свайп</b><span>те саме на телефоні</span>\n      </div>\n      <button class=\"go\" id=\"bStart\" type=\"button\">Бігти</button>\n      <p class=\"note\">Бак зверху — наскільки близько бус. Зіткнення підпускає його ближче, монети й чистий біг відривають.</p>\n    </div>\n\n    <div class=\"card\" id=\"scrOver\" hidden>\n      <h2>Бус наздогнав</h2>\n      <p class=\"tag\" id=\"overLine\">Карась пішов на шашлик.</p>\n      <div class=\"res\">\n        <div><span class=\"lbl\">Метрів</span><span class=\"val\" id=\"rDist\">0</span></div>\n        <div><span class=\"lbl\">Монет</span><span class=\"val\" id=\"rCoins\">0</span></div>\n        <div><span class=\"lbl\">Рахунок</span><span class=\"val\" id=\"rScore\">0</span></div>\n      </div>\n      <button class=\"go\" id=\"bAgain\" type=\"button\">Ще раз</button>\n      <p class=\"note\" id=\"bestNote\"></p>\n    </div>\n\n    <div class=\"card\" id=\"scrPause\" hidden>\n      <h2 style=\"color:var(--gold)\">Пауза</h2>\n      <p class=\"tag\">Бус теж стоїть. Поки що.</p>\n      <button class=\"go\" id=\"bResume\" type=\"button\">Далі</button>\n    </div>\n  </div>";
 
 /* ---------- каталог ---------- */
 var GAMES = [
   {
     id: 'karas',
-    title: 'Карась Тікає',
+    title: 'Гра в Карася 1: Втеча',
     lede: 'Карась відростив ноги, взув кеди і вибіг на трасу. Збирай монети, ухиляйся від баків, калюж і шлагбаумів — позаду чорний бус.',
     chips: ['Раннер', 'Три ряди', 'Клавіші або свайпи'],
     bestKey: 'karas.best',
@@ -173,8 +173,8 @@ var GAMES = [
   },
   {
     id: 'karas2',
-    title: 'Карась 2: Несамовита слють',
-    lede: 'Вид зверху. Зомбі й прибульці сунуть з усіх боків і б\'ють тазом. На вибір — плями на відстань або розочка впритул, далі апгрейди кожні 18 убитих.',
+    title: 'Гра в Карася 2: Несамовита лють',
+    lede: 'Вид зверху. Зомбі й прибульці сунуть з усіх боків і б\'ють тазом. На вибір — плями на відстань або розочка впритул, далі апгрейди кожні 15 убитих.',
     chips: ['Орда', 'Вид зверху', 'Дві зброї'],
     bestKey: 'karas2.best',
     create: createKaras2,
@@ -261,7 +261,15 @@ function openGame(id){
   elMenu.hidden = true;
   elStage.hidden = false;
   liveId = id;
-  live = gm.create(elWrap);
+  try {
+    live = gm.create(elWrap);
+  } catch (err) {
+    elWrap.innerHTML = '';
+    liveId = '';
+    elStage.hidden = true;
+    elMenu.hidden = false;
+    return;
+  }
   try { if (location.hash !== '#' + id) location.hash = id; } catch(e){}
 }
 function closeGame(quiet){
@@ -408,14 +416,6 @@ function thumbSoon(c, w, h, t){
   c.textAlign = 'start'; c.textBaseline = 'alphabetic';
 }
 
-/* ---------- старт ---------- */
-renderTiles();
-startThumbs();
-window.addEventListener('resize', function(){ if (!elMenu.hidden) paintThumbs(performance.now() / 1000); });
-(function(){
-  var h = (location.hash || '').replace('#', '');
-  if (h) openGame(h);
-})();
 
 
 function createKaras(root){
@@ -1664,7 +1664,7 @@ return { stop: stop };
 
 
 /* =======================================================================
-   Карась 2: Несамовита слють — вид зверху, орда, білі плями і розочка
+   Гра в Карася 2: Несамовита лють — вид зверху, орда, білі плями і розочка
    ======================================================================= */
 var K2_TPL = [
 '<canvas id="k2cv"></canvas>',
@@ -1682,8 +1682,8 @@ var K2_TPL = [
 '</div>',
 '<div id="k2ov">',
 '  <div class="card" id="k2Start">',
-'    <h1>Карась 2</h1>',
-'    <p class="sub">Несамовита слють</p>',
+'    <h1>Гра в Карася 2</h1>',
+'    <p class="sub">Несамовита лють</p>',
 '    <p class="tag">Зомбі й прибульці сунуть з усіх боків і б\'ють тазом. Обери, чим відбиватися.</p>',
 '    <div class="weps">',
 '      <button class="wep" id="k2WBlob" type="button">',
@@ -2852,7 +2852,7 @@ var elWave = document.getElementById('k2Wave'), elScore = document.getElementByI
 
 var LINES = [
   'Карась відбивався до останнього плавця.',
-  'Тазів було більше, ніж слюті.',
+  'Тазів було більше, ніж люті.',
   'Прибульці навіть не вибачились.',
   'Волосини вціліли. Решта — ні.'
 ];
@@ -3028,6 +3028,19 @@ function thumbKaras2(c, w, h, t){
   for (var b2 = 0; b2 < 3; b2++) bl(24 + ((t * 120 + b2 * 34) % 70), 0, 4.5, b2 * 5.3);
   c.restore();
 }
+
+/* ---------- старт ----------
+   Запуск стоїть у самому кінці не випадково: шаблони ігор оголошені через var,
+   і до виконання їхніх блоків вони ще undefined. Якщо відкрити сторінку одразу
+   на грі (перезавантаження з #karas2), ранній запуск вписав би в контейнер
+   рядок "undefined" замість розмітки. Нову гру додавай ВИЩЕ цього блоку. */
+renderTiles();
+startThumbs();
+window.addEventListener('resize', function(){ if (!elMenu.hidden) paintThumbs(performance.now() / 1000); });
+(function(){
+  var h = (location.hash || '').replace('#', '');
+  if (h) openGame(h);
+})();
 
 })();
 </script>
