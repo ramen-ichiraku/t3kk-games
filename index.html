@@ -52,6 +52,23 @@ canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
 .res .lbl{display:block;margin-bottom:3px}
 .res .val{font-size:21px}
 .note{font-size:11.5px;color:rgba(242,237,227,.5);margin:14px 0 0;line-height:1.5}
+.weps{display:grid;gap:9px;margin:0 0 16px}
+.wep{display:flex;flex-direction:column;gap:4px;text-align:left;padding:12px 14px;border-radius:12px;background:rgba(242,237,227,.05);border:1px solid rgba(242,237,227,.14);color:var(--paper);font-family:var(--font-b);cursor:pointer;transition:border-color .15s ease,background .15s ease,transform .15s ease}
+.wep:hover,.wep:focus-visible{border-color:var(--gold);background:rgba(245,199,74,.08);transform:translateY(-2px)}
+.wep:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.wname{font-family:var(--font-d);font-weight:700;font-size:15px;color:var(--gold)}
+.wdesc{font-size:12px;line-height:1.45;color:rgba(242,237,227,.68)}
+.ups{display:grid;gap:9px}
+.up{display:flex;align-items:flex-start;gap:11px;text-align:left;padding:11px 13px;border-radius:12px;background:rgba(242,237,227,.05);border:1px solid rgba(242,237,227,.14);color:var(--paper);font-family:var(--font-b);cursor:pointer;transition:border-color .15s ease,background .15s ease}
+.up:hover,.up:focus-visible{border-color:var(--gold);background:rgba(245,199,74,.08)}
+.up:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.upnum{flex:none;width:22px;height:22px;border-radius:6px;background:var(--gold);color:var(--ink);font-family:var(--font-d);font-weight:700;font-size:11px;display:grid;place-items:center}
+.uptext{display:flex;flex-direction:column;gap:3px;min-width:0}
+.uptitle{font-family:var(--font-d);font-weight:700;font-size:13.5px;color:var(--gold)}
+.updesc{font-size:11.5px;line-height:1.4;color:rgba(242,237,227,.68)}
+.go.ghost{background:transparent;border:1px solid rgba(242,237,227,.25);color:rgba(242,237,227,.8);margin-top:8px}
+.go.ghost:hover{border-color:var(--gold);color:var(--gold);background:transparent}
+#k2Lv{flex:none;color:rgba(245,199,74,.85)}
 [hidden]{display:none!important}
 @media (max-width:430px){
   #hud{padding-left:10px;padding-right:10px}
@@ -157,8 +174,8 @@ var GAMES = [
   {
     id: 'karas2',
     title: 'Карась 2: Несамовита слють',
-    lede: 'Вид зверху. Зомбі й прибульці сунуть з усіх боків і б\'ють тазом, карась відстрілюється білими плямами. Хвиля за хвилею, доки вистачає слюті.',
-    chips: ['Орда', 'Вид зверху', 'Авто-вогонь'],
+    lede: 'Вид зверху. Зомбі й прибульці сунуть з усіх боків і б\'ють тазом. На вибір — плями на відстань або розочка впритул, далі апгрейди кожні 18 убитих.',
+    chips: ['Орда', 'Вид зверху', 'Дві зброї'],
     bestKey: 'karas2.best',
     create: createKaras2,
     thumb: thumbKaras2
@@ -671,16 +688,31 @@ function duck(){
   sfxSlide();
 }
 
+/* фізична клавіша, а не символ: на кирилиці WASD дають ц/ф/і/в */
+function keyTok(e){
+  var c = e.code;
+  if (c) return c;
+  var k = e.key || '', kl = k.toLowerCase();
+  if (k === 'ArrowLeft' || k === 'ArrowRight' || k === 'ArrowUp' || k === 'ArrowDown') return k;
+  if (k === ' ') return 'Space';
+  if (kl === 'escape') return 'Escape';
+  if (kl === 'w' || kl === 'ц') return 'KeyW';
+  if (kl === 'a' || kl === 'ф') return 'KeyA';
+  if (kl === 's' || kl === 'і') return 'KeyS';
+  if (kl === 'd' || kl === 'в') return 'KeyD';
+  if (kl === 'p' || kl === 'з') return 'KeyP';
+  return k;
+}
 window.addEventListener('keydown', function(e){
-  var k = e.key;
-  if (k === 'ArrowLeft' || k === 'a' || k === 'A') { move(-1); e.preventDefault(); }
-  else if (k === 'ArrowRight' || k === 'd' || k === 'D') { move(1); e.preventDefault(); }
-  else if (k === 'ArrowUp' || k === 'w' || k === 'W' || k === ' ') {
+  var c = keyTok(e);
+  if (c === 'ArrowLeft' || c === 'KeyA') { move(-1); e.preventDefault(); }
+  else if (c === 'ArrowRight' || c === 'KeyD') { move(1); e.preventDefault(); }
+  else if (c === 'ArrowUp' || c === 'KeyW' || c === 'Space') {
     e.preventDefault();
     if (S.mode === 'menu' || S.mode === 'over') start(); else jump();
   }
-  else if (k === 'ArrowDown' || k === 's' || k === 'S') { duck(); e.preventDefault(); }
-  else if (k === 'Escape' || k === 'p' || k === 'P') { togglePause(); }
+  else if (c === 'ArrowDown' || c === 'KeyS') { duck(); e.preventDefault(); }
+  else if (c === 'Escape' || c === 'KeyP') { togglePause(); }
 }, SIG);
 
 var tsx = 0, tsy = 0;
@@ -1632,7 +1664,7 @@ return { stop: stop };
 
 
 /* =======================================================================
-   Карась 2: Несамовита слють — вид зверху, орда, білі плями
+   Карась 2: Несамовита слють — вид зверху, орда, білі плями і розочка
    ======================================================================= */
 var K2_TPL = [
 '<canvas id="k2cv"></canvas>',
@@ -1642,7 +1674,7 @@ var K2_TPL = [
 '    <div class="stat mid"><span class="lbl">Рахунок</span><span class="val big" id="k2Score">0</span></div>',
 '    <div class="stat"><span class="lbl">Рекорд</span><span class="val" id="k2Best">0</span></div>',
 '  </div>',
-'  <div class="heat"><span class="hlbl">Життя</span><div class="track"><div id="k2Hp"></div></div></div>',
+'  <div class="heat"><span class="hlbl">Життя</span><div class="track"><div id="k2Hp"></div></div><span class="hlbl" id="k2Lv">Плями 1</span></div>',
 '  <div class="tools">',
 '    <button id="k2Sound" class="tbtn" type="button">Звук: увімк.</button>',
 '    <button id="k2Pause" class="tbtn" type="button">Пауза</button>',
@@ -1652,15 +1684,28 @@ var K2_TPL = [
 '  <div class="card" id="k2Start">',
 '    <h1>Карась 2</h1>',
 '    <p class="sub">Несамовита слють</p>',
-'    <p class="tag">Зомбі й прибульці сунуть з усіх боків і б\'ють тазом. У карася є ствол, який плює білими плямами. Тримайся якомога довше.</p>',
+'    <p class="tag">Зомбі й прибульці сунуть з усіх боків і б\'ють тазом. Обери, чим відбиватися.</p>',
+'    <div class="weps">',
+'      <button class="wep" id="k2WBlob" type="button">',
+'        <span class="wname">Плями</span>',
+'        <span class="wdesc">Плює білими плямами на відстань. Безпечніше, але треба влучати.</span>',
+'      </button>',
+'      <button class="wep" id="k2WShard" type="button">',
+'        <span class="wname">Розочка</span>',
+'        <span class="wdesc">Розбита пляшка. Косить по дузі впритул — боляче, але треба підпускати.</span>',
+'      </button>',
+'    </div>',
 '    <div class="keys">',
 '      <b>WASD / ←↑→↓</b><span>рух</span>',
-'      <b>Миша</b><span>напрямок пострілу</span>',
+'      <b>Миша</b><span>напрямок удару</span>',
 '      <b>Палець</b><span>джойстик у будь-якій точці екрана</span>',
-'      <b>Esc</b><span>пауза</span>',
 '    </div>',
-'    <button class="go" id="k2Go" type="button">У бій</button>',
-'    <p class="note">Стріляє само. Кожні 18 убитих — сильніший ствол, з трупів іноді випадає аптечка.</p>',
+'    <p class="note">Б\'є само. Кожні 15 убитих — вибір апгрейда, з трупів іноді випадає аптечка.</p>',
+'  </div>',
+'  <div class="card" id="k2Pick" hidden>',
+'    <h2 style="color:var(--gold)">Апгрейд</h2>',
+'    <p class="tag">Обери, що підсилити. Клавіші 1–3 теж працюють.</p>',
+'    <div class="ups" id="k2Ups"></div>',
 '  </div>',
 '  <div class="card" id="k2Over" hidden>',
 '    <h2>Затоптали</h2>',
@@ -1671,6 +1716,7 @@ var K2_TPL = [
 '      <div><span class="lbl">Рахунок</span><span class="val" id="k2rScore">0</span></div>',
 '    </div>',
 '    <button class="go" id="k2Again" type="button">Ще раз</button>',
+'    <button class="go ghost" id="k2Swap" type="button">Змінити зброю</button>',
 '    <p class="note" id="k2Note"></p>',
 '  </div>',
 '  <div class="card" id="k2Paused" hidden>',
@@ -1693,8 +1739,9 @@ var cv = document.getElementById('k2cv');
 var g = cv.getContext('2d');
 var W = 0, H = 0, DPR = 1;
 
-var ARENA = 1950;          // сторона майданчика
-var PR = 17;               // радіус карася
+var ARENA = 1950;
+var PR = 17;
+var ZOOM = 1.38;            // камера ближче: світ малюється збільшеним
 var REDUCE = false;
 try { REDUCE = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch(e){}
 
@@ -1724,34 +1771,75 @@ function angLerp(a, b, k){
   var d = ((b - a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
   return a + d * k;
 }
+function angDiff(a, b){
+  return Math.abs(((a - b + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI);
+}
+/* фізична клавіша, а не символ: на кирилиці WASD дають ц/ф/і/в */
+function keyTok(e){
+  var c = e.code;
+  if (c) return c;
+  var k = e.key || '', kl = k.toLowerCase();
+  if (k === 'ArrowLeft' || k === 'ArrowRight' || k === 'ArrowUp' || k === 'ArrowDown') return k;
+  if (k === ' ') return 'Space';
+  if (kl === 'escape') return 'Escape';
+  if (kl === 'w' || kl === 'ц') return 'KeyW';
+  if (kl === 'a' || kl === 'ф') return 'KeyA';
+  if (kl === 's' || kl === 'і') return 'KeyS';
+  if (kl === 'd' || kl === 'в') return 'KeyD';
+  if (kl === 'p' || kl === 'з') return 'KeyP';
+  if (k >= '1' && k <= '9') return 'Digit' + k;
+  return k;
+}
 
-/* ---------- рівні зброї ---------- */
-var GUN = [
-  { rate:0.26, n:1, spread:0,    dmg:11 },
-  { rate:0.23, n:1, spread:0,    dmg:13 },
-  { rate:0.21, n:2, spread:0.14, dmg:13 },
-  { rate:0.19, n:2, spread:0.13, dmg:16 },
-  { rate:0.17, n:3, spread:0.19, dmg:16 },
-  { rate:0.16, n:3, spread:0.17, dmg:20 },
-  { rate:0.15, n:4, spread:0.22, dmg:20 },
-  { rate:0.14, n:4, spread:0.20, dmg:24 }
+/* ---------- зброя ---------- */
+function baseStats(w){
+  return w === 'shard'
+    ? { rate:0.40, dmg:38, radius:84, arc:2.2, move:1.05 }
+    : { rate:0.22, dmg:18, n:1, spread:0.16, bspd:640, blife:0.85, pen:0, move:1 };
+}
+var WNAME = { blob:'Плями', shard:'Розочка' };
+
+var UPS = [
+  { id:'rate',  w:'any',   max:5, title:'Швидше',         desc:'Інтервал між ударами −10%',
+    apply:function(){ S.st.rate *= 0.90; } },
+  { id:'dmg',   w:'any',   max:5, title:'Боляче',          desc:'Шкода +16%',
+    apply:function(){ S.st.dmg *= 1.16; } },
+  { id:'hp',    w:'any',   max:3, title:'Живучість',       desc:'+20 до життя і одразу лікує',
+    apply:function(){ S.maxHp += 20; S.hp = Math.min(S.maxHp, S.hp + 20); } },
+  { id:'move',  w:'any',   max:3, title:'Прудкість',       desc:'Швидкість карася +6%',
+    apply:function(){ S.st.move *= 1.06; } },
+  { id:'n',     w:'blob',  max:2, title:'Ще пляма',        desc:'+1 пляма за постріл',
+    apply:function(){ S.st.n += 1; } },
+  { id:'acc',   w:'blob',  max:2, title:'Купніше',         desc:'Розкид −25%',
+    ok:function(){ return S.st.n > 1; },
+    apply:function(){ S.st.spread *= 0.75; } },
+  { id:'bspd',  w:'blob',  max:3, title:'Далекобійність',  desc:'Плями летять швидше й далі',
+    apply:function(){ S.st.bspd *= 1.14; S.st.blife *= 1.10; } },
+  { id:'pen',   w:'blob',  max:1, title:'Наскрізь',         desc:'Пляма пробиває ще одного ворога',
+    apply:function(){ S.st.pen += 1; } },
+  { id:'reach', w:'shard', max:2, title:'Довша розочка',   desc:'Радіус замаху +12%',
+    apply:function(){ S.st.radius *= 1.12; } },
+  { id:'arc',   w:'shard', max:2, title:'Ширший замах',    desc:'Дуга +20°',
+    apply:function(){ S.st.arc = Math.min(Math.PI * 2, S.st.arc + 0.35); } },
+  { id:'knock', w:'shard', max:2, title:'Відкидання',      desc:'Замах відкидає ворогів удвічі далі',
+    apply:function(){ S.knock *= 2; } }
 ];
 
 /* ---------- стан ---------- */
 var S;
-function reset(){
+function reset(wep){
   S = {
-    mode:'menu', t:0,
+    mode:'menu', t:0, wep:wep || 'blob', st:baseStats(wep || 'blob'), taken:{}, knock:220,
     px:ARENA/2, py:ARENA/2, pvx:0, pvy:0, hp:100, maxHp:100,
     aim:-Math.PI/2, aimMouse:false, mx:0, my:0,
-    walk:0, inv:0, hurt:0,
+    walk:0, inv:0, hurt:0, swingT:0,
     camX:ARENA/2, camY:ARENA/2, shake:0, flash:0,
     lvl:0, cool:0, kills:0, score:0, wave:1, waveT:0, spawnT:1.2,
-    foes:[], shots:[], drops:[], fx:[], decals:[],
+    foes:[], shots:[], drops:[], fx:[], decals:[], offers:[],
     toast:null, joy:null
   };
 }
-reset();
+reset('blob');
 
 var best = 0;
 try { best = parseInt(localStorage.getItem('karas2.best') || '0', 10) || 0; } catch(e){}
@@ -1827,11 +1915,16 @@ function sfxShot(){
   nz(t, 0.07, 1500, 1.1, 0.10, null, 420);
   tone(t, 340, 0.07, 'square', 0.06, 130);
 }
-function sfxPlop(){
+function sfxSwing(hit){
   if (!canSfx()) return;
   var t = now0();
-  nz(t, 0.05, 900, 1.6, 0.07, null, 380);
+  nz(t, 0.14, 2800, 0.9, 0.10, null, 700);
+  if (hit) {
+    tone(t + 0.01, 1400, 0.09, 'triangle', 0.10, 2300);
+    nz(t + 0.01, 0.12, 5200, 2.2, 0.09, null, 1400);
+  }
 }
+function sfxPlop(){ if (!canSfx()) return; nz(now0(), 0.05, 900, 1.6, 0.07, null, 380); }
 function sfxSplat(){
   if (!canSfx()) return;
   var t = now0();
@@ -1848,6 +1941,11 @@ function sfxLevel(){
   if (!canSfx()) return;
   var t = now0();
   [0, 5, 9, 12].forEach(function(n, i){ tone(t + i * 0.06, mf(69 + n), 0.15, 'triangle', 0.13); });
+}
+function sfxPickUp(){
+  if (!canSfx()) return;
+  var t = now0();
+  [0, 4, 7].forEach(function(n, i){ tone(t + i * 0.05, mf(72 + n), 0.14, 'square', 0.12); });
 }
 function sfxWave(){
   if (!canSfx()) return;
@@ -1868,7 +1966,6 @@ function sfxOver(){
   [0, -2, -5, -12].forEach(function(n, i){ tone(t + i * 0.14, mf(57 + n), 0.34, 'sawtooth', 0.13); });
 }
 
-/* музика: злий фрігійський риф, темп росте з хвилями */
 var B2 = [40, 40, 43, 41];
 var C2 = [[52, 55, 59, 64], [52, 56, 59, 64], [55, 58, 62, 67], [53, 56, 60, 65]];
 var M = { on:false, step:0, next:0 };
@@ -1909,27 +2006,30 @@ function setSound(on){
 /* ---------- керування ---------- */
 var keys = {};
 window.addEventListener('keydown', function(e){
-  var k = e.key.toLowerCase();
-  if (k === 'arrowleft' || k === 'a') { keys.l = 1; e.preventDefault(); }
-  else if (k === 'arrowright' || k === 'd') { keys.r = 1; e.preventDefault(); }
-  else if (k === 'arrowup' || k === 'w') { keys.u = 1; e.preventDefault(); }
-  else if (k === 'arrowdown' || k === 's') { keys.d = 1; e.preventDefault(); }
-  else if (k === ' ') { e.preventDefault(); if (S.mode === 'menu' || S.mode === 'over') start(); }
-  else if (k === 'escape' || k === 'p') togglePause();
+  var c = keyTok(e);
+  if (c === 'ArrowLeft' || c === 'KeyA') { keys.l = 1; e.preventDefault(); }
+  else if (c === 'ArrowRight' || c === 'KeyD') { keys.r = 1; e.preventDefault(); }
+  else if (c === 'ArrowUp' || c === 'KeyW') { keys.u = 1; e.preventDefault(); }
+  else if (c === 'ArrowDown' || c === 'KeyS') { keys.d = 1; e.preventDefault(); }
+  else if (c === 'Space') { e.preventDefault(); if (S.mode === 'over') start(S.wep); }
+  else if (c === 'Escape' || c === 'KeyP') togglePause();
+  else if (S.mode === 'pick' && (c === 'Digit1' || c === 'Digit2' || c === 'Digit3')) {
+    takeUp(parseInt(c.slice(5), 10) - 1);
+  }
 }, SIG);
 window.addEventListener('keyup', function(e){
-  var k = e.key.toLowerCase();
-  if (k === 'arrowleft' || k === 'a') keys.l = 0;
-  else if (k === 'arrowright' || k === 'd') keys.r = 0;
-  else if (k === 'arrowup' || k === 'w') keys.u = 0;
-  else if (k === 'arrowdown' || k === 's') keys.d = 0;
+  var c = keyTok(e);
+  if (c === 'ArrowLeft' || c === 'KeyA') keys.l = 0;
+  else if (c === 'ArrowRight' || c === 'KeyD') keys.r = 0;
+  else if (c === 'ArrowUp' || c === 'KeyW') keys.u = 0;
+  else if (c === 'ArrowDown' || c === 'KeyS') keys.d = 0;
 }, SIG);
 window.addEventListener('blur', function(){
-  keys = {};
+  keys.l = keys.r = keys.u = keys.d = 0;
   if (S.mode === 'play') togglePause();
 }, SIG);
 document.addEventListener('visibilitychange', function(){
-  if (document.hidden) { keys = {}; if (S.mode === 'play') togglePause(); }
+  if (document.hidden) { keys.l = keys.r = keys.u = keys.d = 0; if (S.mode === 'play') togglePause(); }
   else if (sound) ac();
 }, SIG);
 
@@ -1938,7 +2038,6 @@ wrap.addEventListener('mousemove', function(e){
   S.mx = e.clientX - r.left; S.my = e.clientY - r.top;
   S.aimMouse = true;
 }, SIG);
-
 wrap.addEventListener('touchstart', function(e){
   var p = e.changedTouches[0], r = cv.getBoundingClientRect();
   S.joy = { id:p.identifier, ox:p.clientX - r.left, oy:p.clientY - r.top, dx:0, dy:0 };
@@ -1966,9 +2065,11 @@ wrap.addEventListener('touchcancel', dropJoy, PASS);
 
 /* ---------- вороги ---------- */
 function foeStats(kind, wave){
-  if (kind === 'alien') return { hp: 18 + wave * 9, sp: 132 + wave * 8, r: 15, dmg: 11, pts: 14 };
-  if (kind === 'elite') return { hp: 90 + wave * 30, sp: 62 + wave * 3.2, r: 26, dmg: 20, pts: 45 };
-  return { hp: 30 + wave * 13, sp: 76 + wave * 4.4, r: 18, dmg: 9, pts: 10 };
+  // живучість росте квадратично: будь-яка стеля прокачки колись мусить не витримати
+  var w2 = wave * wave;
+  if (kind === 'alien') return { hp: 16 + wave * 9 + w2 * 1.1, sp: 132 + wave * 8, r: 15, dmg: 11, pts: 14 };
+  if (kind === 'elite') return { hp: 80 + wave * 32 + w2 * 4, sp: 62 + wave * 3.2, r: 26, dmg: 20, pts: 45 };
+  return { hp: 28 + wave * 14 + w2 * 1.8, sp: 76 + wave * 4.4, r: 18, dmg: 9, pts: 10 };
 }
 function pickKind(){
   var w = S.wave, r = Math.random();
@@ -1977,14 +2078,13 @@ function pickKind(){
   return 'zombie';
 }
 function spawnFoe(){
-  if (S.foes.length > 110) return;
+  if (S.foes.length > 150) return;
   var kind = pickKind(), st = foeStats(kind, S.wave);
-  var far = Math.max(W, H) * 0.52 + 60;
+  var far = Math.max(W, H) / ZOOM * 0.55 + 60;
   var run = Math.hypot(S.pvx, S.pvy);
   var head = run > 40 ? Math.atan2(S.pvy, S.pvx) : Math.random() * Math.PI * 2;
   var x, y, tries = 0;
   do {
-    // дві третини виходять назустріч бігу — інакше від орди можна тікати вічно
     var a = (Math.random() < 0.66 && run > 40)
       ? head + (Math.random() - 0.5) * 2.4
       : Math.random() * Math.PI * 2;
@@ -1992,7 +2092,7 @@ function spawnFoe(){
     y = S.py + Math.sin(a) * far;
     x = Math.max(st.r + 8, Math.min(ARENA - st.r - 8, x));
     y = Math.max(st.r + 8, Math.min(ARENA - st.r - 8, y));
-  } while (Math.hypot(x - S.px, y - S.py) < 240 && ++tries < 14);
+  } while (Math.hypot(x - S.px, y - S.py) < 220 && ++tries < 14);
   S.foes.push({
     kind:kind, x:x, y:y, hp:st.hp, max:st.hp, sp:st.sp, r:st.r, dmg:st.dmg, pts:st.pts,
     face:Math.atan2(S.py - y, S.px - x), ph:Math.random() * 6.28,
@@ -2012,21 +2112,39 @@ function splat(x, y, r){
   if (S.decals.length > 150) S.decals.shift();
 }
 
-/* ---------- бій ---------- */
+/* ---------- атака ---------- */
 function shoot(){
-  var gn = GUN[Math.min(GUN.length - 1, S.lvl)];
-  var base = S.aim;
-  for (var i = 0; i < gn.n; i++) {
-    var off = (i - (gn.n - 1) / 2) * gn.spread;
+  var st = S.st, base = S.aim;
+  for (var i = 0; i < st.n; i++) {
+    var off = (i - (st.n - 1) / 2) * st.spread;
     var a = base + off + (Math.random() - 0.5) * 0.05;
     S.shots.push({
       x:S.px + Math.cos(base) * 22, y:S.py + Math.sin(base) * 22,
-      vx:Math.cos(a) * 640, vy:Math.sin(a) * 640,
-      life:0.85, dmg:gn.dmg, r:7 + Math.random() * 2, s:Math.random() * 100
+      vx:Math.cos(a) * st.bspd, vy:Math.sin(a) * st.bspd,
+      life:st.blife, dmg:st.dmg, pen:st.pen, hcd:0, r:7 + Math.random() * 2, s:Math.random() * 100
     });
   }
-  S.cool = gn.rate;
+  S.cool = st.rate;
   sfxShot();
+}
+function swingShard(){
+  var st = S.st, hit = 0;
+  S.swingT = 0.2;
+  for (var j = S.foes.length - 1; j >= 0; j--) {
+    var f = S.foes[j];
+    var dx = f.x - S.px, dy = f.y - S.py;
+    var d = Math.hypot(dx, dy) || 1;
+    if (d > st.radius + f.r) continue;
+    if (angDiff(Math.atan2(dy, dx), S.aim) > st.arc / 2) continue;
+    f.hp -= st.dmg; f.flash = 0.12;
+    f.kx += dx / d * S.knock; f.ky += dy / d * S.knock;
+    puff(f.x, f.y, 5, '#ffffff', 160, 3);
+    splat(f.x, f.y, 8);
+    hit++;
+    if (f.hp <= 0) killFoe(f, j);
+  }
+  S.cool = st.rate;
+  sfxSwing(hit);
 }
 function hurtPlayer(dmg){
   if (S.inv > 0) return;
@@ -2046,11 +2164,60 @@ function killFoe(f, i){
   splat(f.x, f.y, f.r * (0.9 + Math.random() * 0.6));
   sfxSplat();
   if (Math.random() < 0.10) S.drops.push({ x:f.x, y:f.y, t:0 });
-  if (S.kills > 0 && S.kills % 18 === 0 && S.lvl < GUN.length - 1) {
-    S.lvl++;
-    S.toast = { text:'Ствол ' + (S.lvl + 1), life:1.4 };
-    sfxLevel();
+  if (S.kills > 0 && S.kills % 15 === 0) offerUps();
+}
+
+/* ---------- апгрейди ---------- */
+function offerUps(){
+  var pool = [];
+  for (var i = 0; i < UPS.length; i++) {
+    var u = UPS[i];
+    if (u.w !== 'any' && u.w !== S.wep) continue;
+    if ((S.taken[u.id] || 0) >= u.max) continue;
+    if (u.ok && !u.ok()) continue;
+    pool.push(u);
   }
+  if (!pool.length) {
+    S.maxHp += 10; S.hp = Math.min(S.maxHp, S.hp + 25);
+    S.toast = { text:'Другого дихання', life:1.4 };
+    sfxLevel();
+    return;
+  }
+  for (var k = pool.length - 1; k > 0; k--) {
+    var j = (Math.random() * (k + 1)) | 0, tmp = pool[k]; pool[k] = pool[j]; pool[j] = tmp;
+  }
+  S.offers = pool.slice(0, 3);
+  var html = '';
+  for (var q = 0; q < S.offers.length; q++) {
+    var o = S.offers[q];
+    var got = S.taken[o.id] || 0;
+    html += '<button class="up" type="button" data-i="' + q + '">' +
+      '<span class="upnum">' + (q + 1) + '</span>' +
+      '<span class="uptext"><span class="uptitle">' + o.title + '</span>' +
+      '<span class="updesc">' + o.desc + (got ? ' · вже ' + got + '/' + o.max : '') + '</span></span>' +
+    '</button>';
+  }
+  elUps.innerHTML = html;
+  Array.prototype.forEach.call(elUps.querySelectorAll('.up'), function(btn){
+    btn.addEventListener('click', function(){ takeUp(parseInt(btn.getAttribute('data-i'), 10)); }, SIG);
+  });
+  S.mode = 'pick';
+  scPick.hidden = false;
+  sfxLevel();
+}
+function takeUp(i){
+  if (S.mode !== 'pick') return;
+  var o = S.offers[i];
+  if (!o) return;
+  o.apply();
+  S.taken[o.id] = (S.taken[o.id] || 0) + 1;
+  S.lvl++;
+  S.offers = [];
+  scPick.hidden = true;
+  S.mode = 'play';
+  S.toast = { text:o.title, life:1.2 };
+  sfxPickUp();
+  syncHud();
 }
 
 function update(dt){
@@ -2058,6 +2225,7 @@ function update(dt){
   if (S.toast) { S.toast.life -= dt; if (S.toast.life <= 0) S.toast = null; }
   if (S.shake > 0) S.shake = Math.max(0, S.shake - dt * 42);
   if (S.flash > 0) S.flash = Math.max(0, S.flash - dt * 1.8);
+  if (S.swingT > 0) S.swingT = Math.max(0, S.swingT - dt);
   if (S.mode !== 'play') {
     for (var q = S.fx.length - 1; q >= 0; q--) {
       var ff = S.fx[q]; ff.life -= dt;
@@ -2070,7 +2238,6 @@ function update(dt){
   if (S.inv > 0) S.inv -= dt;
   if (S.hurt > 0) S.hurt -= dt;
 
-  /* хвилі */
   S.waveT += dt;
   if (S.waveT > 22) {
     S.waveT = 0; S.wave++;
@@ -2080,12 +2247,11 @@ function update(dt){
   }
   S.spawnT -= dt;
   if (S.spawnT <= 0) {
-    var burst = 1 + Math.min(4, Math.floor(S.wave / 3));
+    var burst = 1 + Math.min(7, Math.floor(S.wave / 2.5));
     for (var b = 0; b < burst; b++) spawnFoe();
-    S.spawnT = Math.max(0.25, 1.45 - S.wave * 0.11);
+    S.spawnT = Math.max(0.20, 1.45 - S.wave * 0.11);
   }
 
-  /* рух гравця */
   var mx = 0, my = 0;
   if (keys.l) mx -= 1;
   if (keys.r) mx += 1;
@@ -2097,7 +2263,7 @@ function update(dt){
   }
   var ml = Math.hypot(mx, my);
   if (ml > 1) { mx /= ml; my /= ml; ml = 1; }
-  var SPD = 214;
+  var SPD = 214 * S.st.move;
   S.pvx += (mx * SPD - S.pvx) * Math.min(1, dt * 14);
   S.pvy += (my * SPD - S.pvy) * Math.min(1, dt * 14);
   S.px += S.pvx * dt;
@@ -2106,7 +2272,6 @@ function update(dt){
   S.py = Math.max(PR + 6, Math.min(ARENA - PR - 6, S.py));
   S.walk += ml * dt * 11;
 
-  /* прицілювання */
   var near = null, nd = 1e9, i, f;
   for (i = 0; i < S.foes.length; i++) {
     f = S.foes[i];
@@ -2114,51 +2279,55 @@ function update(dt){
     if (d2 < nd) { nd = d2; near = f; }
   }
   if (S.aimMouse) {
-    S.aim = Math.atan2(S.my - (S.py - S.camY + H / 2), S.mx - (S.px - S.camX + W / 2));
+    var psx = (S.px - S.camX) * ZOOM + W / 2, psy = (S.py - S.camY) * ZOOM + H / 2;
+    S.aim = Math.atan2(S.my - psy, S.mx - psx);
   } else if (near) {
     S.aim = angLerp(S.aim, Math.atan2(near.y - S.py, near.x - S.px), Math.min(1, dt * 12));
   } else if (ml > 0.1) {
     S.aim = angLerp(S.aim, Math.atan2(my, mx), Math.min(1, dt * 8));
   }
 
-  /* стрільба */
   S.cool -= dt;
-  if (S.cool <= 0 && (near || S.aimMouse)) shoot();
+  if (S.cool <= 0) {
+    if (S.wep === 'shard') {
+      if (near && Math.sqrt(nd) < S.st.radius + 46) swingShard();
+    } else if (near || S.aimMouse) shoot();
+  }
 
-  /* камера */
-  var halfW = Math.min(W / 2, ARENA / 2), halfH = Math.min(H / 2, ARENA / 2);
+  var halfW = Math.min(W / (2 * ZOOM), ARENA / 2), halfH = Math.min(H / (2 * ZOOM), ARENA / 2);
   var tx = Math.max(halfW, Math.min(ARENA - halfW, S.px));
   var ty = Math.max(halfH, Math.min(ARENA - halfH, S.py));
   S.camX += (tx - S.camX) * Math.min(1, dt * 7);
   S.camY += (ty - S.camY) * Math.min(1, dt * 7);
 
-  /* постріли */
   for (i = S.shots.length - 1; i >= 0; i--) {
     var s = S.shots[i];
     s.life -= dt;
+    if (s.hcd > 0) s.hcd -= dt;
     s.x += s.vx * dt; s.y += s.vy * dt;
     if (s.life <= 0 || s.x < 0 || s.y < 0 || s.x > ARENA || s.y > ARENA) {
       if (s.life <= 0) splat(s.x, s.y, s.r * 1.1);
       S.shots.splice(i, 1);
       continue;
     }
+    if (s.hcd > 0) continue;
     for (var j = S.foes.length - 1; j >= 0; j--) {
       f = S.foes[j];
       if (Math.hypot(f.x - s.x, f.y - s.y) > f.r + s.r) continue;
       f.hp -= s.dmg;
       f.flash = 0.12;
       var kb = 90 / (1 + f.r * 0.05);
-      f.kx += s.vx / 640 * kb; f.ky += s.vy / 640 * kb;
+      f.kx += s.vx / Math.max(1, S.st.bspd) * kb; f.ky += s.vy / Math.max(1, S.st.bspd) * kb;
       puff(s.x, s.y, 4, '#ffffff', 130, 2.6);
       splat(s.x, s.y, s.r * 0.9);
-      S.shots.splice(i, 1);
+      if (s.pen > 0) { s.pen--; s.hcd = 0.07; }
+      else S.shots.splice(i, 1);
       sfxPlop();
       if (f.hp <= 0) killFoe(f, j);
       break;
     }
   }
 
-  /* вороги */
   for (i = S.foes.length - 1; i >= 0; i--) {
     f = S.foes[i];
     if (f.flash > 0) f.flash -= dt;
@@ -2167,7 +2336,6 @@ function update(dt){
     f.face = angLerp(f.face, Math.atan2(dy, dx), Math.min(1, dt * 7));
 
     var reach = f.r + PR + 14;
-    // вхід у контакт з гістерезисом: інакше ворог смикається на межі й ніколи не доводить замах
     if (!f.atk && dist < reach) { f.atk = true; f.swing = true; f.ph = -Math.PI / 2; }
     else if (f.atk && dist > reach + 30) { f.atk = false; f.swing = false; }
 
@@ -2175,7 +2343,6 @@ function update(dt){
     f.ph += dt * rate;
     f.wob += dt * 3;
 
-    // пік виносу таза — момент удару
     if (f.swing && f.ph >= Math.PI / 2) {
       f.swing = false;
       if (dist < reach + 18) {
@@ -2188,16 +2355,15 @@ function update(dt){
       if (f.atk) { f.ph = -Math.PI / 2; f.swing = true; }
     }
 
-    // в контакті все одно підтискається, щоб не відпускати жертву
     var lurch = f.atk ? 0.3 : (f.kind === 'alien'
       ? 0.88 + 0.22 * Math.max(0, Math.sin(f.ph))
       : 0.72 + 0.4 * Math.max(0, Math.sin(f.ph)));
     f.x += (dx / dist) * f.sp * lurch * dt;
     f.y += (dy / dist) * f.sp * lurch * dt;
+
     f.x += f.kx * dt; f.y += f.ky * dt;
     f.kx *= 0.86; f.ky *= 0.86;
 
-    // щоб не злипались у точку
     for (var k2 = i - 1; k2 >= 0 && k2 > i - 7; k2--) {
       var o = S.foes[k2];
       var ox = f.x - o.x, oy = f.y - o.y;
@@ -2213,7 +2379,6 @@ function update(dt){
     f.y = Math.max(f.r, Math.min(ARENA - f.r, f.y));
   }
 
-  /* аптечки */
   for (i = S.drops.length - 1; i >= 0; i--) {
     var dr = S.drops[i];
     dr.t += dt;
@@ -2226,7 +2391,6 @@ function update(dt){
     }
   }
 
-  /* частинки */
   for (i = S.fx.length - 1; i >= 0; i--) {
     var p = S.fx[i];
     p.life -= dt;
@@ -2242,12 +2406,13 @@ function sy(y){ return y - S.camY + H / 2; }
 
 function drawGround(){
   g.fillStyle = '#171c1a';
-  g.fillRect(0, 0, W, H);
+  g.fillRect(-W, -H, W * 3, H * 3);
   var step = 110;
   var x0 = Math.floor((S.camX - W / 2) / step) * step;
   var y0 = Math.floor((S.camY - H / 2) / step) * step;
-  for (var x = x0; x < S.camX + W / 2 + step; x += step) {
-    for (var y = y0; y < S.camY + H / 2 + step; y += step) {
+  var x, y;
+  for (x = x0; x < S.camX + W / 2 + step; x += step) {
+    for (y = y0; y < S.camY + H / 2 + step; y += step) {
       var h1 = hash2(x * 0.013 + y * 0.029);
       g.fillStyle = h1 > 0.5 ? '#1b2220' : '#151b19';
       g.fillRect(sx(x), sy(y), step, step);
@@ -2262,19 +2427,18 @@ function drawGround(){
   g.strokeStyle = 'rgba(242,237,227,0.035)';
   g.lineWidth = 1;
   for (x = x0; x < S.camX + W / 2 + step; x += step) {
-    g.beginPath(); g.moveTo(Math.round(sx(x)) + 0.5, 0); g.lineTo(Math.round(sx(x)) + 0.5, H); g.stroke();
+    g.beginPath(); g.moveTo(Math.round(sx(x)) + 0.5, -H); g.lineTo(Math.round(sx(x)) + 0.5, H * 2); g.stroke();
   }
   for (y = y0; y < S.camY + H / 2 + step; y += step) {
-    g.beginPath(); g.moveTo(0, Math.round(sy(y)) + 0.5); g.lineTo(W, Math.round(sy(y)) + 0.5); g.stroke();
+    g.beginPath(); g.moveTo(-W, Math.round(sy(y)) + 0.5); g.lineTo(W * 2, Math.round(sy(y)) + 0.5); g.stroke();
   }
 
-  // межі майданчика
   g.fillStyle = '#0a0d14';
   var L = sx(0), T = sy(0), R = sx(ARENA), B = sy(ARENA);
-  if (L > 0) g.fillRect(0, 0, L, H);
-  if (T > 0) g.fillRect(0, 0, W, T);
-  if (R < W) g.fillRect(R, 0, W - R, H);
-  if (B < H) g.fillRect(0, B, W, H - B);
+  if (L > -W) g.fillRect(-W, -H, L + W, H * 3);
+  if (T > -H) g.fillRect(-W, -H, W * 3, T + H);
+  if (R < W * 2) g.fillRect(R, -H, W * 2, H * 3);
+  if (B < H * 2) g.fillRect(-W, B, W * 3, H * 2);
   g.strokeStyle = 'rgba(245,199,74,0.30)';
   g.lineWidth = 3;
   g.strokeRect(L, T, R - L, B - T);
@@ -2285,15 +2449,6 @@ function drawGround(){
   g.setLineDash([]);
 }
 
-function drawDecals(){
-  for (var i = 0; i < S.decals.length; i++) {
-    var d = S.decals[i];
-    var X = sx(d.x), Y = sy(d.y);
-    if (X < -60 || Y < -60 || X > W + 60 || Y > H + 60) continue;
-    g.fillStyle = 'rgba(238,238,232,0.30)';
-    blob(X, Y, d.r, d.s);
-  }
-}
 function blob(X, Y, r, seed){
   g.beginPath();
   for (var a = 0; a < 10; a++) {
@@ -2303,6 +2458,15 @@ function blob(X, Y, r, seed){
     if (a === 0) g.moveTo(px, py); else g.lineTo(px, py);
   }
   g.closePath(); g.fill();
+}
+function drawDecals(){
+  for (var i = 0; i < S.decals.length; i++) {
+    var d = S.decals[i];
+    var X = sx(d.x), Y = sy(d.y);
+    if (X < -60 || Y < -60 || X > W + 60 || Y > H + 60) continue;
+    g.fillStyle = 'rgba(238,238,232,0.30)';
+    blob(X, Y, d.r, d.s);
+  }
 }
 
 function drawZombie(f){
@@ -2315,8 +2479,6 @@ function drawZombie(f){
   g.rotate(f.face);
   var big = f.kind === 'elite' ? 1.45 : 1;
   var hip = th * amp * big;
-
-  // ноги
   g.strokeStyle = '#2f4423'; g.lineWidth = 6 * big; g.lineCap = 'round';
   [-1, 1].forEach(function(s2){
     g.beginPath();
@@ -2324,13 +2486,10 @@ function drawZombie(f){
     g.lineTo(hip * 0.6 - 10 * big - Math.max(0, -th) * 5, s2 * (11 * big + Math.sin(f.wob + s2) * 2));
     g.stroke();
   });
-  // таз — те, чим б'є
   g.fillStyle = f.flash > 0 ? '#e9f5d6' : '#456530';
   rrect2(hip - 9 * big, -11 * big, 21 * big, 22 * big, 8 * big); g.fill();
-  // тулуб трохи протифазно
   g.fillStyle = f.flash > 0 ? '#f2fbe4' : '#54793a';
   rrect2(-th * 3 * big - 14 * big, -12 * big, 22 * big, 24 * big, 8 * big); g.fill();
-  // руки вперед
   g.strokeStyle = '#4f7136'; g.lineWidth = 5.5 * big;
   [-1, 1].forEach(function(s2){
     g.beginPath();
@@ -2338,7 +2497,6 @@ function drawZombie(f){
     g.quadraticCurveTo(8 * big, s2 * 13 * big, 17 * big + th * 2, s2 * 6 * big);
     g.stroke();
   });
-  // голова
   g.fillStyle = f.flash > 0 ? '#ffffff' : '#79a252';
   g.beginPath(); g.arc(-th * 2 * big + 2 * big, 0, 9.5 * big, 0, 6.2832); g.fill();
   g.fillStyle = '#1b2414';
@@ -2347,7 +2505,6 @@ function drawZombie(f){
   g.restore();
   hpBar(X, Y - f.r - 10, f);
 }
-
 function drawAlien(f){
   var X = sx(f.x), Y = sy(f.y), th = Math.sin(f.ph);
   var amp = f.atk ? 14 : 7;
@@ -2375,17 +2532,14 @@ function drawAlien(f){
     g.quadraticCurveTo(8, s2 * 12, 18 + th * 2, s2 * 4);
     g.stroke();
   });
-  // велика голова
   g.fillStyle = f.flash > 0 ? '#ffffff' : '#a898d8';
-  g.beginPath();
-  g.ellipse(-th * 2 + 3, 0, 12, 10, 0, 0, 6.2832); g.fill();
+  g.beginPath(); g.ellipse(-th * 2 + 3, 0, 12, 10, 0, 0, 6.2832); g.fill();
   g.fillStyle = '#100d1c';
   g.beginPath(); g.ellipse(7, -5, 4.4, 3.1, -0.5, 0, 6.2832); g.fill();
   g.beginPath(); g.ellipse(7, 5, 4.4, 3.1, 0.5, 0, 6.2832); g.fill();
   g.restore();
   hpBar(X, Y - f.r - 10, f);
 }
-
 function hpBar(X, Y, f){
   if (f.hp >= f.max) return;
   var w = f.r * 1.9, k = Math.max(0, f.hp / f.max);
@@ -2397,13 +2551,12 @@ function hpBar(X, Y, f){
 
 function drawPlayer(){
   var X = sx(S.px), Y = sy(S.py);
-  var a = S.aim;
   var wk = Math.sin(S.walk);
   g.save();
   g.translate(X, Y);
   g.fillStyle = 'rgba(0,0,0,0.4)';
   g.beginPath(); g.ellipse(2, 4, PR * 1.25, PR * 1.05, 0, 0, 6.2832); g.fill();
-  g.rotate(a);
+  g.rotate(S.aim);
   if (S.inv > 0 && Math.floor(S.t * 20) % 2 === 0) g.globalAlpha = 0.45;
 
   // хвіст
@@ -2416,7 +2569,7 @@ function drawPlayer(){
   g.closePath(); g.fill();
   g.restore();
 
-  // ноги по боках
+  // ноги
   g.strokeStyle = '#c99c46'; g.lineWidth = 5; g.lineCap = 'round';
   [-1, 1].forEach(function(s2){
     var ph = S.walk + (s2 > 0 ? Math.PI : 0);
@@ -2435,7 +2588,6 @@ function drawPlayer(){
   bg.addColorStop(0, '#8c8c3e'); bg.addColorStop(0.5, '#d3ab55'); bg.addColorStop(1, '#8c8c3e');
   g.fillStyle = bg;
   g.beginPath(); g.ellipse(0, 0, 21, 13, 0, 0, 6.2832); g.fill();
-  // бічні плавці
   g.fillStyle = 'rgba(216,124,56,0.85)';
   [-1, 1].forEach(function(s2){
     g.save(); g.translate(2, s2 * 10); g.rotate(s2 * (0.5 + wk * 0.2));
@@ -2443,26 +2595,81 @@ function drawPlayer(){
     g.quadraticCurveTo(-4, s2 * 4, 0, 0); g.fill();
     g.restore();
   });
-  // голова й очі
+  // риб'яча морда
   g.fillStyle = '#e3c072';
-  g.beginPath(); g.ellipse(15, 0, 9, 9, 0, 0, 6.2832); g.fill();
+  g.beginPath(); g.ellipse(16, 0, 8.5, 8.5, 0, 0, 6.2832); g.fill();
   [-1, 1].forEach(function(s2){
     g.fillStyle = '#f7f3ea';
-    g.beginPath(); g.arc(17, s2 * 5.5, 3.6, 0, 6.2832); g.fill();
+    g.beginPath(); g.arc(18, s2 * 5.4, 3.4, 0, 6.2832); g.fill();
     g.fillStyle = '#14161f';
-    g.beginPath(); g.arc(18.4, s2 * 5.8, 1.8, 0, 6.2832); g.fill();
+    g.beginPath(); g.arc(19.3, s2 * 5.7, 1.7, 0, 6.2832); g.fill();
   });
-  // ствол
-  g.fillStyle = '#2b3140';
-  rrect2(18, -3.6, 20, 7.2, 3); g.fill();
-  g.fillStyle = '#3c4353';
-  rrect2(30, -5, 7, 10, 3); g.fill();
-  if (S.cool > GUN[Math.min(GUN.length - 1, S.lvl)].rate - 0.06) {
-    g.fillStyle = 'rgba(255,255,255,0.85)';
-    blob(42, 0, 8, 7);
+
+  // лиса чоловіча голова згори
+  g.fillStyle = 'rgba(0,0,0,0.22)';
+  g.beginPath(); g.ellipse(3.6, 1.6, 10, 9, 0, 0, 6.2832); g.fill();
+  g.fillStyle = '#d8ac82';
+  g.beginPath(); g.ellipse(4, -8.6, 2.6, 3.4, 0, 0, 6.2832); g.fill();
+  g.beginPath(); g.ellipse(4, 8.6, 2.6, 3.4, 0, 0, 6.2832); g.fill();
+  var sk = g.createRadialGradient(6, -3, 1, 4, 0, 11);
+  sk.addColorStop(0, '#f6d5ad'); sk.addColorStop(0.55, '#e3b98e'); sk.addColorStop(1, '#c79468');
+  g.fillStyle = sk;
+  g.beginPath(); g.ellipse(4, 0, 9.6, 8.6, 0, 0, 6.2832); g.fill();
+  g.fillStyle = 'rgba(255,255,255,0.40)';
+  g.beginPath(); g.ellipse(7.4, -2.6, 3.2, 2.1, -0.5, 0, 6.2832); g.fill();
+  g.strokeStyle = '#7a5433'; g.lineWidth = 1.25; g.lineCap = 'round';
+  for (var hh = 0; hh < 4; hh++) {
+    var hy = (hh - 1.5) * 3.1;
+    var sway = Math.sin(S.t * 7 + hh * 1.4) * 2.2;
+    g.beginPath();
+    g.moveTo(2.5, hy);
+    g.quadraticCurveTo(-2, hy + sway * 0.6, -5.5, hy + sway);
+    g.stroke();
+  }
+
+  // зброя
+  if (S.wep === 'shard') {
+    g.save();
+    g.rotate(S.swingT > 0 ? (S.swingT / 0.2 - 0.5) * 1.1 : Math.sin(S.t * 3) * 0.08);
+    g.fillStyle = 'rgba(126,196,150,0.85)';
+    g.beginPath();
+    g.moveTo(17, -4.5); g.lineTo(31, -6); g.lineTo(34, -2.5); g.lineTo(30, 0);
+    g.lineTo(35, 2); g.lineTo(31, 6); g.lineTo(17, 4.5);
+    g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(230,255,240,0.75)'; g.lineWidth = 1.1;
+    g.beginPath(); g.moveTo(20, -2.5); g.lineTo(29, -3.5); g.moveTo(20, 2.5); g.lineTo(28, 3.5); g.stroke();
+    g.fillStyle = '#4e7a58';
+    rrect2(14, -5.6, 6, 11.2, 2.4); g.fill();
+    g.restore();
+  } else {
+    g.fillStyle = '#2b3140';
+    rrect2(18, -3.6, 20, 7.2, 3); g.fill();
+    g.fillStyle = '#3c4353';
+    rrect2(30, -5, 7, 10, 3); g.fill();
+    if (S.cool > S.st.rate - 0.06) {
+      g.fillStyle = 'rgba(255,255,255,0.85)';
+      blob(42, 0, 8, 7);
+    }
   }
   g.globalAlpha = 1;
   g.restore();
+
+  // слід від замаху розочкою
+  if (S.wep === 'shard' && S.swingT > 0) {
+    var k = S.swingT / 0.2;
+    g.save();
+    g.globalAlpha = k * 0.5;
+    var gr = g.createRadialGradient(X, Y, S.st.radius * 0.35, X, Y, S.st.radius);
+    gr.addColorStop(0, 'rgba(255,255,255,0)');
+    gr.addColorStop(0.7, 'rgba(210,255,225,0.55)');
+    gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr;
+    g.beginPath();
+    g.moveTo(X, Y);
+    g.arc(X, Y, S.st.radius, S.aim - S.st.arc / 2, S.aim + S.st.arc / 2);
+    g.closePath(); g.fill();
+    g.restore();
+  }
 }
 
 function draw(){
@@ -2471,16 +2678,19 @@ function draw(){
   g.save();
   if (S.shake > 0.2 && !REDUCE) g.translate((Math.random() - 0.5) * S.shake, (Math.random() - 0.5) * S.shake);
 
+  /* світ — зі збільшенням; інтерфейс поверх нього малюється без нього */
+  g.save();
+  g.translate(W / 2, H / 2); g.scale(ZOOM, ZOOM); g.translate(-W / 2, -H / 2);
+
   drawGround();
   drawDecals();
 
-  // аптечки
-  for (var i = 0; i < S.drops.length; i++) {
+  var i;
+  for (i = 0; i < S.drops.length; i++) {
     var d = S.drops[i];
     var X = sx(d.x), Y = sy(d.y);
     var pulse = 1 + Math.sin(S.t * 5 + i) * 0.1;
-    var fade2 = d.t > 12 && Math.floor(d.t * 6) % 2 === 0 ? 0.35 : 1;
-    g.globalAlpha = fade2;
+    g.globalAlpha = (d.t > 12 && Math.floor(d.t * 6) % 2 === 0) ? 0.35 : 1;
     g.fillStyle = '#123021';
     g.beginPath(); g.arc(X, Y, 12 * pulse, 0, 6.2832); g.fill();
     g.fillStyle = '#7fd07a';
@@ -2489,7 +2699,6 @@ function draw(){
     g.globalAlpha = 1;
   }
 
-  // сортуємо за Y, щоб нижні перекривали верхніх
   var order = S.foes.slice();
   order.sort(function(a, b){ return a.y - b.y; });
   var drewPlayer = false;
@@ -2502,7 +2711,6 @@ function draw(){
   }
   if (!drewPlayer) drawPlayer();
 
-  // постріли — білі плями
   for (i = 0; i < S.shots.length; i++) {
     var s = S.shots[i];
     var SX = sx(s.x), SY = sy(s.y);
@@ -2512,7 +2720,6 @@ function draw(){
     blob(SX, SY, s.r, s.s);
   }
 
-  // частинки
   for (i = 0; i < S.fx.length; i++) {
     var p = S.fx[i];
     g.globalAlpha = Math.max(0, p.life / p.max);
@@ -2520,15 +2727,15 @@ function draw(){
     g.beginPath(); g.arc(sx(p.x), sy(p.y), p.r, 0, 6.2832); g.fill();
   }
   g.globalAlpha = 1;
+  g.restore();
 
-  // джойстик
+  /* екранний шар */
   if (S.joy) {
     g.strokeStyle = 'rgba(242,237,227,0.22)'; g.lineWidth = 2;
     g.beginPath(); g.arc(S.joy.ox, S.joy.oy, 62, 0, 6.2832); g.stroke();
     g.fillStyle = 'rgba(245,199,74,0.32)';
     g.beginPath(); g.arc(S.joy.ox + S.joy.dx, S.joy.oy + S.joy.dy, 22, 0, 6.2832); g.fill();
   }
-
   if (S.flash > 0) {
     g.fillStyle = 'rgba(232,72,58,' + (S.flash * 0.33).toFixed(3) + ')';
     g.fillRect(0, 0, W, H);
@@ -2559,22 +2766,22 @@ function draw(){
     g.textAlign = 'start'; g.textBaseline = 'alphabetic';
     g.restore();
   }
-
   g.restore();
 }
 
 /* ---------- інтерфейс ---------- */
 var elWave = document.getElementById('k2Wave'), elScore = document.getElementById('k2Score'),
     elBest = document.getElementById('k2Best'), elHp = document.getElementById('k2Hp'),
+    elLv = document.getElementById('k2Lv'), elUps = document.getElementById('k2Ups'),
     scStart = document.getElementById('k2Start'), scOver = document.getElementById('k2Over'),
-    scPause = document.getElementById('k2Paused'), bSound = document.getElementById('k2Sound'),
-    bPause = document.getElementById('k2Pause');
+    scPause = document.getElementById('k2Paused'), scPick = document.getElementById('k2Pick'),
+    bSound = document.getElementById('k2Sound'), bPause = document.getElementById('k2Pause');
 
 var LINES = [
   'Карась відбивався до останнього плавця.',
-  'Тазів було більше, ніж патронів.',
+  'Тазів було більше, ніж слюті.',
   'Прибульці навіть не вибачились.',
-  'Слюті вистачило. Здоров\'я — ні.'
+  'Волосини вціліли. Решта — ні.'
 ];
 
 function syncHud(){
@@ -2584,15 +2791,16 @@ function syncHud(){
   var k = Math.max(0, S.hp / S.maxHp);
   elHp.style.width = (k * 100).toFixed(1) + '%';
   elHp.style.background = k > 0.55 ? '#8fbf5c' : (k > 0.28 ? '#f5c74a' : '#e8483a');
+  elLv.textContent = WNAME[S.wep] + ' ' + (S.lvl + 1);
 }
 function syncSoundBtn(){ bSound.textContent = sound ? 'Звук: увімк.' : 'Звук: вимк.'; }
 
-function start(){
+function start(wep){
   var keep = best;
-  reset();
+  reset(wep);
   best = keep;
   S.mode = 'play';
-  scStart.hidden = true; scOver.hidden = true; scPause.hidden = true;
+  scStart.hidden = true; scOver.hidden = true; scPause.hidden = true; scPick.hidden = true;
   bPause.textContent = 'Пауза';
   audioInit();
   if (A.music) A.music.gain.value = 0.46;
@@ -2603,6 +2811,7 @@ function gameOver(){
   S.mode = 'over';
   S.shake = 24;
   S.toast = null;
+  scPick.hidden = true;
   musicStop();
   sfxOver();
   document.getElementById('k2rWave').textContent = S.wave;
@@ -2630,8 +2839,12 @@ function togglePause(){
     if (A.music) A.music.gain.value = 0.46;
   }
 }
-document.getElementById('k2Go').addEventListener('click', start, SIG);
-document.getElementById('k2Again').addEventListener('click', start, SIG);
+document.getElementById('k2WBlob').addEventListener('click', function(){ start('blob'); }, SIG);
+document.getElementById('k2WShard').addEventListener('click', function(){ start('shard'); }, SIG);
+document.getElementById('k2Again').addEventListener('click', function(){ start(S.wep); }, SIG);
+document.getElementById('k2Swap').addEventListener('click', function(){
+  scOver.hidden = true; scStart.hidden = false; S.mode = 'menu';
+}, SIG);
 document.getElementById('k2Resume').addEventListener('click', togglePause, SIG);
 bPause.addEventListener('click', togglePause, SIG);
 bSound.addEventListener('click', function(){
@@ -2673,7 +2886,7 @@ function stop(){
   root.innerHTML = '';
 }
 
-return { stop: stop, _s: function(){ return S; }, _keys: keys };
+return { stop: stop };
 }
 
 /* ---------- мініатюра ---------- */
@@ -2695,12 +2908,9 @@ function thumbKaras2(c, w, h, t){
   }
 
   c.fillStyle = 'rgba(238,238,232,0.22)';
-  for (var s = 0; s < 7; s++) {
-    bl(w * (0.15 + (s * 0.13) % 0.75), h * (0.2 + (s * 0.29) % 0.7), h * 0.07, s * 3.1);
-  }
+  for (var s = 0; s < 7; s++) bl(w * (0.15 + (s * 0.13) % 0.75), h * (0.2 + (s * 0.29) % 0.7), h * 0.07, s * 3.1);
 
   var cx = w * 0.5, cy = h * 0.54, R = Math.min(w, h);
-  // вороги по колу
   for (var i = 0; i < 6; i++) {
     var ang = t * 0.5 + i * (Math.PI * 2 / 6);
     var dd = R * (0.40 - 0.07 * Math.sin(t * 0.9 + i));
@@ -2709,13 +2919,11 @@ function thumbKaras2(c, w, h, t){
     c.save(); c.translate(ex, ey); c.rotate(Math.atan2(cy - ey, cx - ex));
     var alien = i % 2 === 1;
     c.fillStyle = alien ? '#5d4f8e' : '#456530';
-    c.beginPath(); c.roundRect ? c.roundRect(th * 5 - 5, -5, 11, 10, 4) : c.rect(th * 5 - 5, -5, 11, 10);
-    c.fill();
+    c.fillRect(th * 5 - 5, -5, 11, 10);
     c.fillStyle = alien ? '#a898d8' : '#79a252';
     c.beginPath(); c.arc(-th * 1.5 + 2, 0, alien ? 6 : 5, 0, 6.2832); c.fill();
     c.restore();
   }
-  // карась у центрі
   c.save(); c.translate(cx, cy); c.rotate(Math.sin(t * 0.7) * 0.5);
   c.fillStyle = 'rgba(216,124,56,0.9)';
   c.beginPath(); c.moveTo(-8, 0); c.lineTo(-20, -8); c.quadraticCurveTo(-14, 0, -20, 8); c.closePath(); c.fill();
@@ -2723,12 +2931,17 @@ function thumbKaras2(c, w, h, t){
   bg.addColorStop(0, '#8c8c3e'); bg.addColorStop(0.5, '#d3ab55'); bg.addColorStop(1, '#8c8c3e');
   c.fillStyle = bg;
   c.beginPath(); c.ellipse(0, 0, 13, 8, 0, 0, 6.2832); c.fill();
+  c.fillStyle = '#e3b98e';
+  c.beginPath(); c.ellipse(2, 0, 6, 5.4, 0, 0, 6.2832); c.fill();
+  c.strokeStyle = '#7a5433'; c.lineWidth = 1;
+  for (var hh = 0; hh < 3; hh++) {
+    c.beginPath(); c.moveTo(1, (hh - 1) * 2);
+    c.quadraticCurveTo(-2, (hh - 1) * 2 + Math.sin(t * 7 + hh), -4, (hh - 1) * 2 + Math.sin(t * 7 + hh) * 1.6);
+    c.stroke();
+  }
   c.fillStyle = '#2b3140'; c.fillRect(11, -2, 13, 4);
   c.fillStyle = '#ffffff';
-  for (var b2 = 0; b2 < 3; b2++) {
-    var d2 = ((t * 120 + b2 * 34) % 70);
-    bl(24 + d2, 0, 4.5, b2 * 5.3);
-  }
+  for (var b2 = 0; b2 < 3; b2++) bl(24 + ((t * 120 + b2 * 34) % 70), 0, 4.5, b2 * 5.3);
   c.restore();
 }
 
