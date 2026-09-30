@@ -1,4 +1,4 @@
-<title>Аркада Карася</title>
+<title>Технікал Геймз</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Rubik:wght@400;500;700&display=swap">
 <style>
 /* Layout: full-bleed canvas road with a thin HUD rail pinned to the top and centered modal cards. */
@@ -16,7 +16,7 @@ body{background:var(--night);color:var(--paper);font-family:var(--font-b);oversc
 #wrap{position:relative;width:100%;height:100%;overflow:hidden;background:var(--night);touch-action:none;user-select:none;-webkit-user-select:none}
 canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
 
-#hud{position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;gap:8px;padding:12px 16px 0;padding-top:calc(12px + env(safe-area-inset-top,0px))}
+#hud,#k2hud{position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;gap:8px;padding:12px 16px 0;padding-top:calc(12px + env(safe-area-inset-top,0px))}
 .bar{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .stat{display:flex;flex-direction:column;gap:2px;background:rgba(10,13,26,.55);border:1px solid rgba(245,199,74,.22);border-radius:10px;padding:6px 11px;backdrop-filter:blur(7px);min-width:0}
 .stat.mid{align-items:center}
@@ -34,9 +34,11 @@ canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
 .tbtn:hover{border-color:var(--gold);color:var(--gold)}
 .tbtn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 
-#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;overflow:auto;padding:16px;pointer-events:none}
+#overlay,#k2ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;overflow:auto;padding:16px;pointer-events:none}
 .card{pointer-events:auto;margin:auto;width:min(420px,100%);background:linear-gradient(170deg,rgba(18,22,44,.94),rgba(10,13,26,.96));border:1px solid rgba(245,199,74,.28);border-radius:18px;padding:22px 20px;box-shadow:0 24px 60px rgba(0,0,0,.6);text-align:center}
 .card h1{font-family:var(--font-d);font-weight:900;font-size:clamp(28px,7vw,40px);line-height:.98;margin:0 0 6px;color:var(--gold);text-wrap:balance;letter-spacing:-.01em}
+.card .sub{margin:-3px 0 11px;font-family:var(--font-d);font-weight:500;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:rgba(232,72,58,.92)}
+#k2Hp{height:100%;width:100%;border-radius:99px;background:#8fbf5c;transition:width .12s linear,background-color .2s linear}
 .card h2{font-family:var(--font-d);font-weight:700;font-size:clamp(22px,5.5vw,29px);margin:0 0 4px;color:var(--danger);text-wrap:balance}
 .tag{font-size:13px;line-height:1.5;color:rgba(242,237,227,.72);margin:0 0 16px}
 .keys{display:grid;grid-template-columns:auto 1fr;gap:7px 12px;text-align:left;font-size:12.5px;margin:0 0 18px;align-items:center}
@@ -69,7 +71,7 @@ canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
   .go{padding:11px 22px;font-size:14px}
   .note{margin-top:10px}
 }
-@media (prefers-reduced-motion:reduce){#heatFill{transition:none}}
+@media (prefers-reduced-motion:reduce){#heatFill,#k2Hp{transition:none}}
 
 /* Layout: каталог — сітка карток над повноекранною сценою, у яку монтується гра. */
 #app{position:relative;height:100%;width:100%;overflow:hidden}
@@ -121,8 +123,8 @@ canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
 <div id="app">
   <main id="menu">
     <header class="mhead">
-      <p class="eyebrow">Аркада</p>
-      <h1 class="mtitle">Аркада <em>Карася</em></h1>
+      <p class="eyebrow">Збірка ігор</p>
+      <h1 class="mtitle">Технікал <em>Геймз</em></h1>
       <p class="mlede">Маленькі браузерні ігри, які запускаються з одного файлу й не просять нічого встановлювати. Обери, у що бігти.</p>
     </header>
     <div class="tiles" id="tiles"></div>
@@ -153,12 +155,13 @@ var GAMES = [
     thumb: thumbKaras
   },
   {
-    id: 'soon',
-    soon: true,
-    title: 'Друга гра',
-    lede: 'Місце вже підготовлене: нова гра додається одним записом у каталозі й окремою функцією поруч із цією.',
-    chips: ['У роботі'],
-    thumb: thumbSoon
+    id: 'karas2',
+    title: 'Карась 2: Несамовита слють',
+    lede: 'Вид зверху. Зомбі й прибульці сунуть з усіх боків і б\'ють тазом, карась відстрілюється білими плямами. Хвиля за хвилею, доки вистачає слюті.',
+    chips: ['Орда', 'Вид зверху', 'Авто-вогонь'],
+    bestKey: 'karas2.best',
+    create: createKaras2,
+    thumb: thumbKaras2
   }
 ];
 
@@ -1625,6 +1628,1108 @@ function stop(){
 }
 
 return { stop: stop };
+}
+
+
+/* =======================================================================
+   Карась 2: Несамовита слють — вид зверху, орда, білі плями
+   ======================================================================= */
+var K2_TPL = [
+'<canvas id="k2cv"></canvas>',
+'<div id="k2hud">',
+'  <div class="bar">',
+'    <div class="stat"><span class="lbl">Хвиля</span><span class="val" id="k2Wave">1</span></div>',
+'    <div class="stat mid"><span class="lbl">Рахунок</span><span class="val big" id="k2Score">0</span></div>',
+'    <div class="stat"><span class="lbl">Рекорд</span><span class="val" id="k2Best">0</span></div>',
+'  </div>',
+'  <div class="heat"><span class="hlbl">Життя</span><div class="track"><div id="k2Hp"></div></div></div>',
+'  <div class="tools">',
+'    <button id="k2Sound" class="tbtn" type="button">Звук: увімк.</button>',
+'    <button id="k2Pause" class="tbtn" type="button">Пауза</button>',
+'  </div>',
+'</div>',
+'<div id="k2ov">',
+'  <div class="card" id="k2Start">',
+'    <h1>Карась 2</h1>',
+'    <p class="sub">Несамовита слють</p>',
+'    <p class="tag">Зомбі й прибульці сунуть з усіх боків і б\'ють тазом. У карася є ствол, який плює білими плямами. Тримайся якомога довше.</p>',
+'    <div class="keys">',
+'      <b>WASD / ←↑→↓</b><span>рух</span>',
+'      <b>Миша</b><span>напрямок пострілу</span>',
+'      <b>Палець</b><span>джойстик у будь-якій точці екрана</span>',
+'      <b>Esc</b><span>пауза</span>',
+'    </div>',
+'    <button class="go" id="k2Go" type="button">У бій</button>',
+'    <p class="note">Стріляє само. Кожні 18 убитих — сильніший ствол, з трупів іноді випадає аптечка.</p>',
+'  </div>',
+'  <div class="card" id="k2Over" hidden>',
+'    <h2>Затоптали</h2>',
+'    <p class="tag" id="k2Line">Карась відбивався до останнього плавця.</p>',
+'    <div class="res">',
+'      <div><span class="lbl">Хвиль</span><span class="val" id="k2rWave">0</span></div>',
+'      <div><span class="lbl">Вбито</span><span class="val" id="k2rKills">0</span></div>',
+'      <div><span class="lbl">Рахунок</span><span class="val" id="k2rScore">0</span></div>',
+'    </div>',
+'    <button class="go" id="k2Again" type="button">Ще раз</button>',
+'    <p class="note" id="k2Note"></p>',
+'  </div>',
+'  <div class="card" id="k2Paused" hidden>',
+'    <h2 style="color:var(--gold)">Пауза</h2>',
+'    <p class="tag">Орда чекає.</p>',
+'    <button class="go" id="k2Resume" type="button">Далі</button>',
+'  </div>',
+'</div>'
+].join('');
+
+function createKaras2(root){
+'use strict';
+
+root.innerHTML = K2_TPL;
+var AB = new AbortController(), SIG = { signal: AB.signal };
+var PASS = { passive: true, signal: AB.signal };
+
+var wrap = root;
+var cv = document.getElementById('k2cv');
+var g = cv.getContext('2d');
+var W = 0, H = 0, DPR = 1;
+
+var ARENA = 1950;          // сторона майданчика
+var PR = 17;               // радіус карася
+var REDUCE = false;
+try { REDUCE = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch(e){}
+
+function resize(){
+  var r = wrap.getBoundingClientRect();
+  W = Math.max(1, Math.round(r.width));
+  H = Math.max(1, Math.round(r.height));
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  g.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener('resize', resize, SIG);
+
+function hash2(n){ var v = Math.sin(n * 91.7 + 3.3) * 39121.71; return v - Math.floor(v); }
+function rrect2(x, y, w, h, r){
+  if (r > w / 2) r = w / 2;
+  if (r > h / 2) r = h / 2;
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r);
+  g.lineTo(x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  g.lineTo(x + r, y + h); g.quadraticCurveTo(x, y + h, x, y + h - r);
+  g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y);
+  g.closePath();
+}
+function angLerp(a, b, k){
+  var d = ((b - a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+  return a + d * k;
+}
+
+/* ---------- рівні зброї ---------- */
+var GUN = [
+  { rate:0.26, n:1, spread:0,    dmg:11 },
+  { rate:0.23, n:1, spread:0,    dmg:13 },
+  { rate:0.21, n:2, spread:0.14, dmg:13 },
+  { rate:0.19, n:2, spread:0.13, dmg:16 },
+  { rate:0.17, n:3, spread:0.19, dmg:16 },
+  { rate:0.16, n:3, spread:0.17, dmg:20 },
+  { rate:0.15, n:4, spread:0.22, dmg:20 },
+  { rate:0.14, n:4, spread:0.20, dmg:24 }
+];
+
+/* ---------- стан ---------- */
+var S;
+function reset(){
+  S = {
+    mode:'menu', t:0,
+    px:ARENA/2, py:ARENA/2, pvx:0, pvy:0, hp:100, maxHp:100,
+    aim:-Math.PI/2, aimMouse:false, mx:0, my:0,
+    walk:0, inv:0, hurt:0,
+    camX:ARENA/2, camY:ARENA/2, shake:0, flash:0,
+    lvl:0, cool:0, kills:0, score:0, wave:1, waveT:0, spawnT:1.2,
+    foes:[], shots:[], drops:[], fx:[], decals:[],
+    toast:null, joy:null
+  };
+}
+reset();
+
+var best = 0;
+try { best = parseInt(localStorage.getItem('karas2.best') || '0', 10) || 0; } catch(e){}
+
+/* ---------- звук ---------- */
+var sound = true;
+try { var sv = localStorage.getItem('karas.sound'); if (sv === '0') sound = false; } catch(e){}
+var AC = null, A = { master:null, music:null, sfx:null, comp:null, noise:null };
+
+function ac(){
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){ return null; } }
+  if (AC.state === 'suspended') { try { AC.resume(); } catch(e){} }
+  return AC;
+}
+function audioInit(){
+  var a = ac();
+  if (!a || A.master) return a;
+  A.comp = a.createDynamicsCompressor();
+  A.comp.threshold.value = -15; A.comp.ratio.value = 7;
+  A.comp.attack.value = 0.004; A.comp.release.value = 0.14;
+  A.master = a.createGain(); A.master.gain.value = sound ? 0.85 : 0;
+  A.music = a.createGain(); A.music.gain.value = 0.46;
+  A.sfx = a.createGain(); A.sfx.gain.value = 1;
+  A.music.connect(A.comp); A.sfx.connect(A.comp);
+  A.comp.connect(A.master); A.master.connect(a.destination);
+  var len = Math.floor(a.sampleRate * 1.5);
+  A.noise = a.createBuffer(1, len, a.sampleRate);
+  var ch = A.noise.getChannelData(0);
+  for (var i = 0; i < len; i++) ch[i] = Math.random() * 2 - 1;
+  return a;
+}
+function mf(m){ return 440 * Math.pow(2, (m - 69) / 12); }
+function tone(t, f, dur, type, vol, to, dest){
+  if (!AC || !A.master) return;
+  var o = AC.createOscillator(), gn = AC.createGain();
+  o.type = type || 'square';
+  o.frequency.setValueAtTime(f, t);
+  if (to) o.frequency.exponentialRampToValueAtTime(Math.max(28, to), t + dur);
+  gn.gain.setValueAtTime(0.0001, t);
+  gn.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t + Math.min(0.012, dur * 0.25));
+  gn.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(gn); gn.connect(dest || A.sfx);
+  o.start(t); o.stop(t + dur + 0.03);
+}
+function nz(t, dur, freq, q, vol, dest, to){
+  if (!AC || !A.noise) return;
+  var s = AC.createBufferSource(), bp = AC.createBiquadFilter(), gn = AC.createGain();
+  s.buffer = A.noise; s.loop = true;
+  bp.type = 'bandpass'; bp.frequency.setValueAtTime(freq, t); bp.Q.value = q || 1;
+  if (to) bp.frequency.exponentialRampToValueAtTime(Math.max(60, to), t + dur);
+  gn.gain.setValueAtTime(Math.max(0.0002, vol), t);
+  gn.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(bp); bp.connect(gn); gn.connect(dest || A.sfx);
+  s.start(t); s.stop(t + dur + 0.03);
+}
+function kick(t, dest){
+  if (!AC) return;
+  var o = AC.createOscillator(), gn = AC.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(168, t);
+  o.frequency.exponentialRampToValueAtTime(44, t + 0.09);
+  gn.gain.setValueAtTime(0.32, t);
+  gn.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+  o.connect(gn); gn.connect(dest || A.music);
+  o.start(t); o.stop(t + 0.18);
+}
+function canSfx(){ return sound && AC && A.master; }
+function now0(){ return AC ? AC.currentTime : 0; }
+
+function sfxShot(){
+  if (!canSfx()) return;
+  var t = now0();
+  nz(t, 0.07, 1500, 1.1, 0.10, null, 420);
+  tone(t, 340, 0.07, 'square', 0.06, 130);
+}
+function sfxPlop(){
+  if (!canSfx()) return;
+  var t = now0();
+  nz(t, 0.05, 900, 1.6, 0.07, null, 380);
+}
+function sfxSplat(){
+  if (!canSfx()) return;
+  var t = now0();
+  nz(t, 0.22, 700, 0.8, 0.16, null, 90);
+  tone(t, 150, 0.16, 'sawtooth', 0.07, 48);
+}
+function sfxHurt(){
+  if (!canSfx()) return;
+  var t = now0();
+  nz(t, 0.16, 300, 0.7, 0.20);
+  tone(t, 210, 0.22, 'square', 0.13, 62);
+}
+function sfxLevel(){
+  if (!canSfx()) return;
+  var t = now0();
+  [0, 5, 9, 12].forEach(function(n, i){ tone(t + i * 0.06, mf(69 + n), 0.15, 'triangle', 0.13); });
+}
+function sfxWave(){
+  if (!canSfx()) return;
+  var t = now0();
+  tone(t, mf(45), 0.34, 'sawtooth', 0.14);
+  tone(t + 0.12, mf(52), 0.34, 'sawtooth', 0.13);
+  nz(t, 0.4, 260, 0.6, 0.10);
+}
+function sfxHeal(){
+  if (!canSfx()) return;
+  var t = now0();
+  [0, 7, 12].forEach(function(n, i){ tone(t + i * 0.05, mf(76 + n), 0.13, 'sine', 0.12); });
+}
+function sfxOver(){
+  if (!canSfx()) return;
+  var t = now0();
+  nz(t, 0.6, 800, 0.5, 0.2, null, 90);
+  [0, -2, -5, -12].forEach(function(n, i){ tone(t + i * 0.14, mf(57 + n), 0.34, 'sawtooth', 0.13); });
+}
+
+/* музика: злий фрігійський риф, темп росте з хвилями */
+var B2 = [40, 40, 43, 41];
+var C2 = [[52, 55, 59, 64], [52, 56, 59, 64], [55, 58, 62, 67], [53, 56, 60, 65]];
+var M = { on:false, step:0, next:0 };
+function musicStart(){ if (!audioInit() || M.on) return; M.on = true; M.step = 0; M.next = AC.currentTime + 0.1; }
+function musicStop(){ M.on = false; }
+function musicTick(){
+  if (!M.on || !sound || !AC || !A.music) return;
+  var heat = Math.min(1, (S.wave - 1) / 9);
+  var bpm = 146 + heat * 40;
+  var sp = 60 / bpm / 4;
+  var guard = 0;
+  while (M.next < AC.currentTime + 0.18 && guard++ < 64) {
+    musicStep(M.step, M.next, heat);
+    M.next += sp;
+    M.step = (M.step + 1) % 64;
+  }
+  if (M.next < AC.currentTime) M.next = AC.currentTime + 0.05;
+}
+function musicStep(i, t, heat){
+  var bar = (i >> 4) & 3, k = i & 15;
+  if (k % 4 === 0) kick(t, A.music);
+  if (k === 4 || k === 12) nz(t, 0.13, 1900, 0.9, 0.12, A.music);
+  if (k % 2 === 1) nz(t, 0.03, 8200, 1.4, 0.035 + heat * 0.025, A.music);
+  if (k === 0 || k === 2 || k === 5 || k === 8 || k === 10 || k === 13) {
+    tone(t, mf(B2[bar]), 0.12, 'sawtooth', 0.17, null, A.music);
+  }
+  var ch = C2[bar];
+  if (k % 2 === 0) tone(t, mf(ch[(i * 5) % 4]), 0.09, 'square', 0.04 + heat * 0.03, null, A.music);
+  if (heat > 0.5 && k === 14) tone(t, mf(B2[bar] + 12), 0.09, 'square', 0.05, null, A.music);
+}
+function setSound(on){
+  sound = on;
+  try { localStorage.setItem('karas.sound', on ? '1' : '0'); } catch(e){}
+  if (on) { audioInit(); if (A.master) A.master.gain.value = 0.85; }
+  else if (A.master) A.master.gain.value = 0;
+}
+
+/* ---------- керування ---------- */
+var keys = {};
+window.addEventListener('keydown', function(e){
+  var k = e.key.toLowerCase();
+  if (k === 'arrowleft' || k === 'a') { keys.l = 1; e.preventDefault(); }
+  else if (k === 'arrowright' || k === 'd') { keys.r = 1; e.preventDefault(); }
+  else if (k === 'arrowup' || k === 'w') { keys.u = 1; e.preventDefault(); }
+  else if (k === 'arrowdown' || k === 's') { keys.d = 1; e.preventDefault(); }
+  else if (k === ' ') { e.preventDefault(); if (S.mode === 'menu' || S.mode === 'over') start(); }
+  else if (k === 'escape' || k === 'p') togglePause();
+}, SIG);
+window.addEventListener('keyup', function(e){
+  var k = e.key.toLowerCase();
+  if (k === 'arrowleft' || k === 'a') keys.l = 0;
+  else if (k === 'arrowright' || k === 'd') keys.r = 0;
+  else if (k === 'arrowup' || k === 'w') keys.u = 0;
+  else if (k === 'arrowdown' || k === 's') keys.d = 0;
+}, SIG);
+window.addEventListener('blur', function(){
+  keys = {};
+  if (S.mode === 'play') togglePause();
+}, SIG);
+document.addEventListener('visibilitychange', function(){
+  if (document.hidden) { keys = {}; if (S.mode === 'play') togglePause(); }
+  else if (sound) ac();
+}, SIG);
+
+wrap.addEventListener('mousemove', function(e){
+  var r = cv.getBoundingClientRect();
+  S.mx = e.clientX - r.left; S.my = e.clientY - r.top;
+  S.aimMouse = true;
+}, SIG);
+
+wrap.addEventListener('touchstart', function(e){
+  var p = e.changedTouches[0], r = cv.getBoundingClientRect();
+  S.joy = { id:p.identifier, ox:p.clientX - r.left, oy:p.clientY - r.top, dx:0, dy:0 };
+}, PASS);
+wrap.addEventListener('touchmove', function(e){
+  if (!S.joy) return;
+  for (var i = 0; i < e.changedTouches.length; i++) {
+    var p = e.changedTouches[i];
+    if (p.identifier !== S.joy.id) continue;
+    var r = cv.getBoundingClientRect();
+    var dx = (p.clientX - r.left) - S.joy.ox, dy = (p.clientY - r.top) - S.joy.oy;
+    var d = Math.hypot(dx, dy), max = 62;
+    if (d > max) { dx = dx / d * max; dy = dy / d * max; }
+    S.joy.dx = dx; S.joy.dy = dy;
+  }
+}, PASS);
+function dropJoy(e){
+  if (!S.joy) return;
+  for (var i = 0; i < e.changedTouches.length; i++) {
+    if (e.changedTouches[i].identifier === S.joy.id) S.joy = null;
+  }
+}
+wrap.addEventListener('touchend', dropJoy, PASS);
+wrap.addEventListener('touchcancel', dropJoy, PASS);
+
+/* ---------- вороги ---------- */
+function foeStats(kind, wave){
+  if (kind === 'alien') return { hp: 18 + wave * 9, sp: 132 + wave * 8, r: 15, dmg: 11, pts: 14 };
+  if (kind === 'elite') return { hp: 90 + wave * 30, sp: 62 + wave * 3.2, r: 26, dmg: 20, pts: 45 };
+  return { hp: 30 + wave * 13, sp: 76 + wave * 4.4, r: 18, dmg: 9, pts: 10 };
+}
+function pickKind(){
+  var w = S.wave, r = Math.random();
+  if (w >= 4 && r < 0.09 + Math.min(0.12, w * 0.012)) return 'elite';
+  if (w >= 2 && r < 0.30 + Math.min(0.34, w * 0.042)) return 'alien';
+  return 'zombie';
+}
+function spawnFoe(){
+  if (S.foes.length > 110) return;
+  var kind = pickKind(), st = foeStats(kind, S.wave);
+  var far = Math.max(W, H) * 0.52 + 60;
+  var run = Math.hypot(S.pvx, S.pvy);
+  var head = run > 40 ? Math.atan2(S.pvy, S.pvx) : Math.random() * Math.PI * 2;
+  var x, y, tries = 0;
+  do {
+    // дві третини виходять назустріч бігу — інакше від орди можна тікати вічно
+    var a = (Math.random() < 0.66 && run > 40)
+      ? head + (Math.random() - 0.5) * 2.4
+      : Math.random() * Math.PI * 2;
+    x = S.px + Math.cos(a) * far;
+    y = S.py + Math.sin(a) * far;
+    x = Math.max(st.r + 8, Math.min(ARENA - st.r - 8, x));
+    y = Math.max(st.r + 8, Math.min(ARENA - st.r - 8, y));
+  } while (Math.hypot(x - S.px, y - S.py) < 240 && ++tries < 14);
+  S.foes.push({
+    kind:kind, x:x, y:y, hp:st.hp, max:st.hp, sp:st.sp, r:st.r, dmg:st.dmg, pts:st.pts,
+    face:Math.atan2(S.py - y, S.px - x), ph:Math.random() * 6.28,
+    atk:false, swing:false, flash:0, kx:0, ky:0, wob:Math.random() * 6.28
+  });
+}
+
+/* ---------- частинки й плями ---------- */
+function puff(x, y, n, col, pw, rad){
+  for (var i = 0; i < n; i++) {
+    var a = Math.random() * Math.PI * 2, sp = (0.35 + Math.random()) * pw;
+    S.fx.push({ x:x, y:y, vx:Math.cos(a) * sp, vy:Math.sin(a) * sp, life:0.4 + Math.random() * 0.4, max:0.8, col:col, r:(rad || 3) * (0.5 + Math.random()) });
+  }
+}
+function splat(x, y, r){
+  S.decals.push({ x:x, y:y, r:r, s:Math.random() * 100 });
+  if (S.decals.length > 150) S.decals.shift();
+}
+
+/* ---------- бій ---------- */
+function shoot(){
+  var gn = GUN[Math.min(GUN.length - 1, S.lvl)];
+  var base = S.aim;
+  for (var i = 0; i < gn.n; i++) {
+    var off = (i - (gn.n - 1) / 2) * gn.spread;
+    var a = base + off + (Math.random() - 0.5) * 0.05;
+    S.shots.push({
+      x:S.px + Math.cos(base) * 22, y:S.py + Math.sin(base) * 22,
+      vx:Math.cos(a) * 640, vy:Math.sin(a) * 640,
+      life:0.85, dmg:gn.dmg, r:7 + Math.random() * 2, s:Math.random() * 100
+    });
+  }
+  S.cool = gn.rate;
+  sfxShot();
+}
+function hurtPlayer(dmg){
+  if (S.inv > 0) return;
+  S.hp -= dmg;
+  S.inv = 0.42;
+  S.hurt = 0.4;
+  S.shake = 13;
+  S.flash = 0.4;
+  sfxHurt();
+  if (S.hp <= 0) { S.hp = 0; gameOver(); }
+}
+function killFoe(f, i){
+  S.foes.splice(i, 1);
+  S.kills++;
+  S.score += f.pts;
+  puff(f.x, f.y, f.kind === 'elite' ? 18 : 10, f.kind === 'alien' ? '#b49ae8' : '#8fbf5c', 210, 4);
+  splat(f.x, f.y, f.r * (0.9 + Math.random() * 0.6));
+  sfxSplat();
+  if (Math.random() < 0.10) S.drops.push({ x:f.x, y:f.y, t:0 });
+  if (S.kills > 0 && S.kills % 18 === 0 && S.lvl < GUN.length - 1) {
+    S.lvl++;
+    S.toast = { text:'Ствол ' + (S.lvl + 1), life:1.4 };
+    sfxLevel();
+  }
+}
+
+function update(dt){
+  S.t += dt;
+  if (S.toast) { S.toast.life -= dt; if (S.toast.life <= 0) S.toast = null; }
+  if (S.shake > 0) S.shake = Math.max(0, S.shake - dt * 42);
+  if (S.flash > 0) S.flash = Math.max(0, S.flash - dt * 1.8);
+  if (S.mode !== 'play') {
+    for (var q = S.fx.length - 1; q >= 0; q--) {
+      var ff = S.fx[q]; ff.life -= dt;
+      if (ff.life <= 0) S.fx.splice(q, 1);
+      else { ff.x += ff.vx * dt; ff.y += ff.vy * dt; ff.vx *= 0.92; ff.vy *= 0.92; }
+    }
+    return;
+  }
+
+  if (S.inv > 0) S.inv -= dt;
+  if (S.hurt > 0) S.hurt -= dt;
+
+  /* хвилі */
+  S.waveT += dt;
+  if (S.waveT > 22) {
+    S.waveT = 0; S.wave++;
+    S.score += 25 * S.wave;
+    S.toast = { text:'Хвиля ' + S.wave, life:1.5 };
+    sfxWave();
+  }
+  S.spawnT -= dt;
+  if (S.spawnT <= 0) {
+    var burst = 1 + Math.min(4, Math.floor(S.wave / 3));
+    for (var b = 0; b < burst; b++) spawnFoe();
+    S.spawnT = Math.max(0.25, 1.45 - S.wave * 0.11);
+  }
+
+  /* рух гравця */
+  var mx = 0, my = 0;
+  if (keys.l) mx -= 1;
+  if (keys.r) mx += 1;
+  if (keys.u) my -= 1;
+  if (keys.d) my += 1;
+  if (S.joy) {
+    var jd = Math.hypot(S.joy.dx, S.joy.dy);
+    if (jd > 8) { mx += S.joy.dx / 62; my += S.joy.dy / 62; }
+  }
+  var ml = Math.hypot(mx, my);
+  if (ml > 1) { mx /= ml; my /= ml; ml = 1; }
+  var SPD = 214;
+  S.pvx += (mx * SPD - S.pvx) * Math.min(1, dt * 14);
+  S.pvy += (my * SPD - S.pvy) * Math.min(1, dt * 14);
+  S.px += S.pvx * dt;
+  S.py += S.pvy * dt;
+  S.px = Math.max(PR + 6, Math.min(ARENA - PR - 6, S.px));
+  S.py = Math.max(PR + 6, Math.min(ARENA - PR - 6, S.py));
+  S.walk += ml * dt * 11;
+
+  /* прицілювання */
+  var near = null, nd = 1e9, i, f;
+  for (i = 0; i < S.foes.length; i++) {
+    f = S.foes[i];
+    var d2 = (f.x - S.px) * (f.x - S.px) + (f.y - S.py) * (f.y - S.py);
+    if (d2 < nd) { nd = d2; near = f; }
+  }
+  if (S.aimMouse) {
+    S.aim = Math.atan2(S.my - (S.py - S.camY + H / 2), S.mx - (S.px - S.camX + W / 2));
+  } else if (near) {
+    S.aim = angLerp(S.aim, Math.atan2(near.y - S.py, near.x - S.px), Math.min(1, dt * 12));
+  } else if (ml > 0.1) {
+    S.aim = angLerp(S.aim, Math.atan2(my, mx), Math.min(1, dt * 8));
+  }
+
+  /* стрільба */
+  S.cool -= dt;
+  if (S.cool <= 0 && (near || S.aimMouse)) shoot();
+
+  /* камера */
+  var halfW = Math.min(W / 2, ARENA / 2), halfH = Math.min(H / 2, ARENA / 2);
+  var tx = Math.max(halfW, Math.min(ARENA - halfW, S.px));
+  var ty = Math.max(halfH, Math.min(ARENA - halfH, S.py));
+  S.camX += (tx - S.camX) * Math.min(1, dt * 7);
+  S.camY += (ty - S.camY) * Math.min(1, dt * 7);
+
+  /* постріли */
+  for (i = S.shots.length - 1; i >= 0; i--) {
+    var s = S.shots[i];
+    s.life -= dt;
+    s.x += s.vx * dt; s.y += s.vy * dt;
+    if (s.life <= 0 || s.x < 0 || s.y < 0 || s.x > ARENA || s.y > ARENA) {
+      if (s.life <= 0) splat(s.x, s.y, s.r * 1.1);
+      S.shots.splice(i, 1);
+      continue;
+    }
+    for (var j = S.foes.length - 1; j >= 0; j--) {
+      f = S.foes[j];
+      if (Math.hypot(f.x - s.x, f.y - s.y) > f.r + s.r) continue;
+      f.hp -= s.dmg;
+      f.flash = 0.12;
+      var kb = 90 / (1 + f.r * 0.05);
+      f.kx += s.vx / 640 * kb; f.ky += s.vy / 640 * kb;
+      puff(s.x, s.y, 4, '#ffffff', 130, 2.6);
+      splat(s.x, s.y, s.r * 0.9);
+      S.shots.splice(i, 1);
+      sfxPlop();
+      if (f.hp <= 0) killFoe(f, j);
+      break;
+    }
+  }
+
+  /* вороги */
+  for (i = S.foes.length - 1; i >= 0; i--) {
+    f = S.foes[i];
+    if (f.flash > 0) f.flash -= dt;
+    var dx = S.px - f.x, dy = S.py - f.y;
+    var dist = Math.hypot(dx, dy) || 1;
+    f.face = angLerp(f.face, Math.atan2(dy, dx), Math.min(1, dt * 7));
+
+    var reach = f.r + PR + 14;
+    // вхід у контакт з гістерезисом: інакше ворог смикається на межі й ніколи не доводить замах
+    if (!f.atk && dist < reach) { f.atk = true; f.swing = true; f.ph = -Math.PI / 2; }
+    else if (f.atk && dist > reach + 30) { f.atk = false; f.swing = false; }
+
+    var rate = f.atk ? 6.6 : 5.2;
+    f.ph += dt * rate;
+    f.wob += dt * 3;
+
+    // пік виносу таза — момент удару
+    if (f.swing && f.ph >= Math.PI / 2) {
+      f.swing = false;
+      if (dist < reach + 18) {
+        hurtPlayer(f.dmg + Math.floor(S.wave * 0.5));
+        if (S.mode !== 'play') return;
+        var pa = Math.atan2(dy, dx);
+        S.pvx -= Math.cos(pa) * 210;
+        S.pvy -= Math.sin(pa) * 210;
+      }
+      if (f.atk) { f.ph = -Math.PI / 2; f.swing = true; }
+    }
+
+    // в контакті все одно підтискається, щоб не відпускати жертву
+    var lurch = f.atk ? 0.3 : (f.kind === 'alien'
+      ? 0.88 + 0.22 * Math.max(0, Math.sin(f.ph))
+      : 0.72 + 0.4 * Math.max(0, Math.sin(f.ph)));
+    f.x += (dx / dist) * f.sp * lurch * dt;
+    f.y += (dy / dist) * f.sp * lurch * dt;
+    f.x += f.kx * dt; f.y += f.ky * dt;
+    f.kx *= 0.86; f.ky *= 0.86;
+
+    // щоб не злипались у точку
+    for (var k2 = i - 1; k2 >= 0 && k2 > i - 7; k2--) {
+      var o = S.foes[k2];
+      var ox = f.x - o.x, oy = f.y - o.y;
+      var od = Math.hypot(ox, oy);
+      var minD = f.r + o.r;
+      if (od > 0.01 && od < minD) {
+        var push = (minD - od) * 0.5;
+        f.x += ox / od * push; f.y += oy / od * push;
+        o.x -= ox / od * push; o.y -= oy / od * push;
+      }
+    }
+    f.x = Math.max(f.r, Math.min(ARENA - f.r, f.x));
+    f.y = Math.max(f.r, Math.min(ARENA - f.r, f.y));
+  }
+
+  /* аптечки */
+  for (i = S.drops.length - 1; i >= 0; i--) {
+    var dr = S.drops[i];
+    dr.t += dt;
+    if (dr.t > 16) { S.drops.splice(i, 1); continue; }
+    if (Math.hypot(dr.x - S.px, dr.y - S.py) < PR + 16) {
+      S.hp = Math.min(S.maxHp, S.hp + 18);
+      S.drops.splice(i, 1);
+      puff(dr.x, dr.y, 8, '#7fd07a', 150, 3);
+      sfxHeal();
+    }
+  }
+
+  /* частинки */
+  for (i = S.fx.length - 1; i >= 0; i--) {
+    var p = S.fx[i];
+    p.life -= dt;
+    if (p.life <= 0) { S.fx.splice(i, 1); continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.vx *= 0.92; p.vy *= 0.92;
+  }
+}
+
+/* ---------- малювання ---------- */
+function sx(x){ return x - S.camX + W / 2; }
+function sy(y){ return y - S.camY + H / 2; }
+
+function drawGround(){
+  g.fillStyle = '#171c1a';
+  g.fillRect(0, 0, W, H);
+  var step = 110;
+  var x0 = Math.floor((S.camX - W / 2) / step) * step;
+  var y0 = Math.floor((S.camY - H / 2) / step) * step;
+  for (var x = x0; x < S.camX + W / 2 + step; x += step) {
+    for (var y = y0; y < S.camY + H / 2 + step; y += step) {
+      var h1 = hash2(x * 0.013 + y * 0.029);
+      g.fillStyle = h1 > 0.5 ? '#1b2220' : '#151b19';
+      g.fillRect(sx(x), sy(y), step, step);
+      if (h1 > 0.86) {
+        g.fillStyle = 'rgba(94,109,58,0.18)';
+        g.beginPath();
+        g.arc(sx(x + 30 + h1 * 40), sy(y + 20 + h1 * 50), 14 + h1 * 16, 0, 6.2832);
+        g.fill();
+      }
+    }
+  }
+  g.strokeStyle = 'rgba(242,237,227,0.035)';
+  g.lineWidth = 1;
+  for (x = x0; x < S.camX + W / 2 + step; x += step) {
+    g.beginPath(); g.moveTo(Math.round(sx(x)) + 0.5, 0); g.lineTo(Math.round(sx(x)) + 0.5, H); g.stroke();
+  }
+  for (y = y0; y < S.camY + H / 2 + step; y += step) {
+    g.beginPath(); g.moveTo(0, Math.round(sy(y)) + 0.5); g.lineTo(W, Math.round(sy(y)) + 0.5); g.stroke();
+  }
+
+  // межі майданчика
+  g.fillStyle = '#0a0d14';
+  var L = sx(0), T = sy(0), R = sx(ARENA), B = sy(ARENA);
+  if (L > 0) g.fillRect(0, 0, L, H);
+  if (T > 0) g.fillRect(0, 0, W, T);
+  if (R < W) g.fillRect(R, 0, W - R, H);
+  if (B < H) g.fillRect(0, B, W, H - B);
+  g.strokeStyle = 'rgba(245,199,74,0.30)';
+  g.lineWidth = 3;
+  g.strokeRect(L, T, R - L, B - T);
+  g.strokeStyle = 'rgba(232,72,58,0.25)';
+  g.setLineDash([16, 12]);
+  g.lineWidth = 2;
+  g.strokeRect(L - 7, T - 7, R - L + 14, B - T + 14);
+  g.setLineDash([]);
+}
+
+function drawDecals(){
+  for (var i = 0; i < S.decals.length; i++) {
+    var d = S.decals[i];
+    var X = sx(d.x), Y = sy(d.y);
+    if (X < -60 || Y < -60 || X > W + 60 || Y > H + 60) continue;
+    g.fillStyle = 'rgba(238,238,232,0.30)';
+    blob(X, Y, d.r, d.s);
+  }
+}
+function blob(X, Y, r, seed){
+  g.beginPath();
+  for (var a = 0; a < 10; a++) {
+    var ang = a / 10 * Math.PI * 2;
+    var rr = r * (0.72 + hash2(seed + a * 1.7) * 0.6);
+    var px = X + Math.cos(ang) * rr, py = Y + Math.sin(ang) * rr;
+    if (a === 0) g.moveTo(px, py); else g.lineTo(px, py);
+  }
+  g.closePath(); g.fill();
+}
+
+function drawZombie(f){
+  var X = sx(f.x), Y = sy(f.y), th = Math.sin(f.ph);
+  var amp = f.atk ? 13 : 6;
+  g.save();
+  g.translate(X, Y);
+  g.fillStyle = 'rgba(0,0,0,0.35)';
+  g.beginPath(); g.ellipse(2, 4, f.r * 1.02, f.r * 0.9, 0, 0, 6.2832); g.fill();
+  g.rotate(f.face);
+  var big = f.kind === 'elite' ? 1.45 : 1;
+  var hip = th * amp * big;
+
+  // ноги
+  g.strokeStyle = '#2f4423'; g.lineWidth = 6 * big; g.lineCap = 'round';
+  [-1, 1].forEach(function(s2){
+    g.beginPath();
+    g.moveTo(hip * 0.6 - 2, s2 * 6 * big);
+    g.lineTo(hip * 0.6 - 10 * big - Math.max(0, -th) * 5, s2 * (11 * big + Math.sin(f.wob + s2) * 2));
+    g.stroke();
+  });
+  // таз — те, чим б'є
+  g.fillStyle = f.flash > 0 ? '#e9f5d6' : '#456530';
+  rrect2(hip - 9 * big, -11 * big, 21 * big, 22 * big, 8 * big); g.fill();
+  // тулуб трохи протифазно
+  g.fillStyle = f.flash > 0 ? '#f2fbe4' : '#54793a';
+  rrect2(-th * 3 * big - 14 * big, -12 * big, 22 * big, 24 * big, 8 * big); g.fill();
+  // руки вперед
+  g.strokeStyle = '#4f7136'; g.lineWidth = 5.5 * big;
+  [-1, 1].forEach(function(s2){
+    g.beginPath();
+    g.moveTo(-4 * big, s2 * 10 * big);
+    g.quadraticCurveTo(8 * big, s2 * 13 * big, 17 * big + th * 2, s2 * 6 * big);
+    g.stroke();
+  });
+  // голова
+  g.fillStyle = f.flash > 0 ? '#ffffff' : '#79a252';
+  g.beginPath(); g.arc(-th * 2 * big + 2 * big, 0, 9.5 * big, 0, 6.2832); g.fill();
+  g.fillStyle = '#1b2414';
+  g.beginPath(); g.arc(6 * big, -4 * big, 2.1 * big, 0, 6.2832); g.fill();
+  g.beginPath(); g.arc(6 * big, 4 * big, 2.1 * big, 0, 6.2832); g.fill();
+  g.restore();
+  hpBar(X, Y - f.r - 10, f);
+}
+
+function drawAlien(f){
+  var X = sx(f.x), Y = sy(f.y), th = Math.sin(f.ph);
+  var amp = f.atk ? 14 : 7;
+  g.save();
+  g.translate(X, Y);
+  g.fillStyle = 'rgba(0,0,0,0.35)';
+  g.beginPath(); g.ellipse(2, 4, f.r, f.r * 0.86, 0, 0, 6.2832); g.fill();
+  g.rotate(f.face);
+  var hip = th * amp;
+  g.strokeStyle = '#4b3f76'; g.lineWidth = 4.5; g.lineCap = 'round';
+  [-1, 1].forEach(function(s2){
+    g.beginPath();
+    g.moveTo(hip * 0.6 - 2, s2 * 5);
+    g.lineTo(hip * 0.6 - 11, s2 * (10 + Math.sin(f.wob + s2 * 2) * 2.5));
+    g.stroke();
+  });
+  g.fillStyle = f.flash > 0 ? '#f4eaff' : '#5d4f8e';
+  rrect2(hip - 8, -9, 18, 18, 7); g.fill();
+  g.fillStyle = f.flash > 0 ? '#ffffff' : '#7565ab';
+  rrect2(-th * 3 - 12, -8, 17, 16, 6); g.fill();
+  g.strokeStyle = '#6a5a9d'; g.lineWidth = 3.4;
+  [-1, 1].forEach(function(s2){
+    g.beginPath();
+    g.moveTo(-3, s2 * 7);
+    g.quadraticCurveTo(8, s2 * 12, 18 + th * 2, s2 * 4);
+    g.stroke();
+  });
+  // велика голова
+  g.fillStyle = f.flash > 0 ? '#ffffff' : '#a898d8';
+  g.beginPath();
+  g.ellipse(-th * 2 + 3, 0, 12, 10, 0, 0, 6.2832); g.fill();
+  g.fillStyle = '#100d1c';
+  g.beginPath(); g.ellipse(7, -5, 4.4, 3.1, -0.5, 0, 6.2832); g.fill();
+  g.beginPath(); g.ellipse(7, 5, 4.4, 3.1, 0.5, 0, 6.2832); g.fill();
+  g.restore();
+  hpBar(X, Y - f.r - 10, f);
+}
+
+function hpBar(X, Y, f){
+  if (f.hp >= f.max) return;
+  var w = f.r * 1.9, k = Math.max(0, f.hp / f.max);
+  g.fillStyle = 'rgba(8,10,18,0.66)';
+  g.fillRect(X - w / 2, Y, w, 4);
+  g.fillStyle = k > 0.45 ? '#8fbf5c' : '#e8483a';
+  g.fillRect(X - w / 2, Y, w * k, 4);
+}
+
+function drawPlayer(){
+  var X = sx(S.px), Y = sy(S.py);
+  var a = S.aim;
+  var wk = Math.sin(S.walk);
+  g.save();
+  g.translate(X, Y);
+  g.fillStyle = 'rgba(0,0,0,0.4)';
+  g.beginPath(); g.ellipse(2, 4, PR * 1.25, PR * 1.05, 0, 0, 6.2832); g.fill();
+  g.rotate(a);
+  if (S.inv > 0 && Math.floor(S.t * 20) % 2 === 0) g.globalAlpha = 0.45;
+
+  // хвіст
+  g.save();
+  g.rotate(wk * 0.28);
+  g.fillStyle = 'rgba(216,124,56,0.92)';
+  g.beginPath();
+  g.moveTo(-14, 0); g.lineTo(-33, -13);
+  g.quadraticCurveTo(-24, 0, -33, 13);
+  g.closePath(); g.fill();
+  g.restore();
+
+  // ноги по боках
+  g.strokeStyle = '#c99c46'; g.lineWidth = 5; g.lineCap = 'round';
+  [-1, 1].forEach(function(s2){
+    var ph = S.walk + (s2 > 0 ? Math.PI : 0);
+    g.beginPath();
+    g.moveTo(-2, s2 * 9);
+    g.lineTo(-2 + Math.cos(ph) * 7, s2 * (15 + Math.abs(Math.sin(ph)) * 3));
+    g.stroke();
+    g.fillStyle = '#f2ede3';
+    g.beginPath();
+    g.ellipse(-2 + Math.cos(ph) * 9, s2 * (17 + Math.abs(Math.sin(ph)) * 3), 5, 3.4, 0, 0, 6.2832);
+    g.fill();
+  });
+
+  // тіло
+  var bg = g.createLinearGradient(0, -14, 0, 14);
+  bg.addColorStop(0, '#8c8c3e'); bg.addColorStop(0.5, '#d3ab55'); bg.addColorStop(1, '#8c8c3e');
+  g.fillStyle = bg;
+  g.beginPath(); g.ellipse(0, 0, 21, 13, 0, 0, 6.2832); g.fill();
+  // бічні плавці
+  g.fillStyle = 'rgba(216,124,56,0.85)';
+  [-1, 1].forEach(function(s2){
+    g.save(); g.translate(2, s2 * 10); g.rotate(s2 * (0.5 + wk * 0.2));
+    g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(8, s2 * 7, -3, s2 * 10);
+    g.quadraticCurveTo(-4, s2 * 4, 0, 0); g.fill();
+    g.restore();
+  });
+  // голова й очі
+  g.fillStyle = '#e3c072';
+  g.beginPath(); g.ellipse(15, 0, 9, 9, 0, 0, 6.2832); g.fill();
+  [-1, 1].forEach(function(s2){
+    g.fillStyle = '#f7f3ea';
+    g.beginPath(); g.arc(17, s2 * 5.5, 3.6, 0, 6.2832); g.fill();
+    g.fillStyle = '#14161f';
+    g.beginPath(); g.arc(18.4, s2 * 5.8, 1.8, 0, 6.2832); g.fill();
+  });
+  // ствол
+  g.fillStyle = '#2b3140';
+  rrect2(18, -3.6, 20, 7.2, 3); g.fill();
+  g.fillStyle = '#3c4353';
+  rrect2(30, -5, 7, 10, 3); g.fill();
+  if (S.cool > GUN[Math.min(GUN.length - 1, S.lvl)].rate - 0.06) {
+    g.fillStyle = 'rgba(255,255,255,0.85)';
+    blob(42, 0, 8, 7);
+  }
+  g.globalAlpha = 1;
+  g.restore();
+}
+
+function draw(){
+  g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  g.clearRect(0, 0, W, H);
+  g.save();
+  if (S.shake > 0.2 && !REDUCE) g.translate((Math.random() - 0.5) * S.shake, (Math.random() - 0.5) * S.shake);
+
+  drawGround();
+  drawDecals();
+
+  // аптечки
+  for (var i = 0; i < S.drops.length; i++) {
+    var d = S.drops[i];
+    var X = sx(d.x), Y = sy(d.y);
+    var pulse = 1 + Math.sin(S.t * 5 + i) * 0.1;
+    var fade2 = d.t > 12 && Math.floor(d.t * 6) % 2 === 0 ? 0.35 : 1;
+    g.globalAlpha = fade2;
+    g.fillStyle = '#123021';
+    g.beginPath(); g.arc(X, Y, 12 * pulse, 0, 6.2832); g.fill();
+    g.fillStyle = '#7fd07a';
+    g.fillRect(X - 7 * pulse, Y - 2.4 * pulse, 14 * pulse, 4.8 * pulse);
+    g.fillRect(X - 2.4 * pulse, Y - 7 * pulse, 4.8 * pulse, 14 * pulse);
+    g.globalAlpha = 1;
+  }
+
+  // сортуємо за Y, щоб нижні перекривали верхніх
+  var order = S.foes.slice();
+  order.sort(function(a, b){ return a.y - b.y; });
+  var drewPlayer = false;
+  for (i = 0; i < order.length; i++) {
+    var f = order[i];
+    if (!drewPlayer && f.y > S.py) { drawPlayer(); drewPlayer = true; }
+    var X2 = sx(f.x), Y2 = sy(f.y);
+    if (X2 < -70 || Y2 < -70 || X2 > W + 70 || Y2 > H + 70) continue;
+    if (f.kind === 'alien') drawAlien(f); else drawZombie(f);
+  }
+  if (!drewPlayer) drawPlayer();
+
+  // постріли — білі плями
+  for (i = 0; i < S.shots.length; i++) {
+    var s = S.shots[i];
+    var SX = sx(s.x), SY = sy(s.y);
+    g.fillStyle = 'rgba(255,255,255,0.25)';
+    blob(SX - s.vx * 0.012, SY - s.vy * 0.012, s.r * 0.8, s.s + 3);
+    g.fillStyle = '#ffffff';
+    blob(SX, SY, s.r, s.s);
+  }
+
+  // частинки
+  for (i = 0; i < S.fx.length; i++) {
+    var p = S.fx[i];
+    g.globalAlpha = Math.max(0, p.life / p.max);
+    g.fillStyle = p.col;
+    g.beginPath(); g.arc(sx(p.x), sy(p.y), p.r, 0, 6.2832); g.fill();
+  }
+  g.globalAlpha = 1;
+
+  // джойстик
+  if (S.joy) {
+    g.strokeStyle = 'rgba(242,237,227,0.22)'; g.lineWidth = 2;
+    g.beginPath(); g.arc(S.joy.ox, S.joy.oy, 62, 0, 6.2832); g.stroke();
+    g.fillStyle = 'rgba(245,199,74,0.32)';
+    g.beginPath(); g.arc(S.joy.ox + S.joy.dx, S.joy.oy + S.joy.dy, 22, 0, 6.2832); g.fill();
+  }
+
+  if (S.flash > 0) {
+    g.fillStyle = 'rgba(232,72,58,' + (S.flash * 0.33).toFixed(3) + ')';
+    g.fillRect(0, 0, W, H);
+  }
+  var lowHp = S.hp / S.maxHp;
+  if (lowHp < 0.35 && S.mode === 'play') {
+    var pul = (0.35 - lowHp) / 0.35 * (0.2 + 0.14 * Math.sin(S.t * 7));
+    var rg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.24, W / 2, H / 2, Math.max(W, H) * 0.62);
+    rg.addColorStop(0, 'rgba(232,72,58,0)');
+    rg.addColorStop(1, 'rgba(232,72,58,' + Math.max(0, pul).toFixed(3) + ')');
+    g.fillStyle = rg; g.fillRect(0, 0, W, H);
+  }
+  var vg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.78);
+  vg.addColorStop(0, 'rgba(6,8,16,0)'); vg.addColorStop(1, 'rgba(6,8,16,0.6)');
+  g.fillStyle = vg; g.fillRect(0, 0, W, H);
+
+  if (S.toast) {
+    g.save();
+    g.globalAlpha = Math.min(1, S.toast.life / 0.4) * Math.min(1, (1.5 - S.toast.life) / 0.12);
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    var fsz = Math.max(20, Math.min(48, W * 0.085));
+    g.font = '700 ' + fsz.toFixed(0) + 'px Unbounded, Trebuchet MS, sans-serif';
+    var ty = H * 0.26 - (1.5 - S.toast.life) * 22;
+    g.lineWidth = fsz * 0.16; g.strokeStyle = 'rgba(8,10,18,0.8)';
+    g.strokeText(S.toast.text, W / 2, ty);
+    g.fillStyle = '#f5c74a';
+    g.fillText(S.toast.text, W / 2, ty);
+    g.textAlign = 'start'; g.textBaseline = 'alphabetic';
+    g.restore();
+  }
+
+  g.restore();
+}
+
+/* ---------- інтерфейс ---------- */
+var elWave = document.getElementById('k2Wave'), elScore = document.getElementById('k2Score'),
+    elBest = document.getElementById('k2Best'), elHp = document.getElementById('k2Hp'),
+    scStart = document.getElementById('k2Start'), scOver = document.getElementById('k2Over'),
+    scPause = document.getElementById('k2Paused'), bSound = document.getElementById('k2Sound'),
+    bPause = document.getElementById('k2Pause');
+
+var LINES = [
+  'Карась відбивався до останнього плавця.',
+  'Тазів було більше, ніж патронів.',
+  'Прибульці навіть не вибачились.',
+  'Слюті вистачило. Здоров\'я — ні.'
+];
+
+function syncHud(){
+  elWave.textContent = S.wave;
+  elScore.textContent = S.score;
+  elBest.textContent = best;
+  var k = Math.max(0, S.hp / S.maxHp);
+  elHp.style.width = (k * 100).toFixed(1) + '%';
+  elHp.style.background = k > 0.55 ? '#8fbf5c' : (k > 0.28 ? '#f5c74a' : '#e8483a');
+}
+function syncSoundBtn(){ bSound.textContent = sound ? 'Звук: увімк.' : 'Звук: вимк.'; }
+
+function start(){
+  var keep = best;
+  reset();
+  best = keep;
+  S.mode = 'play';
+  scStart.hidden = true; scOver.hidden = true; scPause.hidden = true;
+  bPause.textContent = 'Пауза';
+  audioInit();
+  if (A.music) A.music.gain.value = 0.46;
+  musicStart();
+  syncHud();
+}
+function gameOver(){
+  S.mode = 'over';
+  S.shake = 24;
+  S.toast = null;
+  musicStop();
+  sfxOver();
+  document.getElementById('k2rWave').textContent = S.wave;
+  document.getElementById('k2rKills').textContent = S.kills;
+  document.getElementById('k2rScore').textContent = S.score;
+  document.getElementById('k2Line').textContent = LINES[(Math.random() * LINES.length) | 0];
+  var note = document.getElementById('k2Note');
+  if (S.score > best) {
+    best = S.score;
+    try { localStorage.setItem('karas2.best', String(best)); } catch(e){}
+    note.textContent = 'Новий рекорд — ' + best + '.';
+  } else {
+    note.textContent = 'Рекорд — ' + best + '. Не дотягнув ' + (best - S.score) + '.';
+  }
+  scOver.hidden = false;
+  syncHud();
+}
+function togglePause(){
+  if (S.mode === 'play') {
+    S.mode = 'pause'; scPause.hidden = false; bPause.textContent = 'Далі';
+    if (A.music) A.music.gain.value = 0;
+  } else if (S.mode === 'pause') {
+    S.mode = 'play'; scPause.hidden = true; bPause.textContent = 'Пауза';
+    ac();
+    if (A.music) A.music.gain.value = 0.46;
+  }
+}
+document.getElementById('k2Go').addEventListener('click', start, SIG);
+document.getElementById('k2Again').addEventListener('click', start, SIG);
+document.getElementById('k2Resume').addEventListener('click', togglePause, SIG);
+bPause.addEventListener('click', togglePause, SIG);
+bSound.addEventListener('click', function(){
+  setSound(!sound);
+  syncSoundBtn();
+  if (sound && S.mode === 'play') musicStart();
+}, SIG);
+syncSoundBtn();
+
+/* ---------- цикл ---------- */
+var last = 0, hudT = 0, rafId = 0, dead = false;
+function frame(now){
+  if (dead) return;
+  if (!last) last = now;
+  var dt = (now - last) / 1000;
+  last = now;
+  if (dt > 0.05) dt = 0.05;
+  update(dt);
+  if (S.mode === 'play') musicTick();
+  draw();
+  hudT += dt;
+  if (hudT > 0.08) { hudT = 0; syncHud(); }
+  rafId = requestAnimationFrame(frame);
+}
+
+resize();
+syncHud();
+rafId = requestAnimationFrame(frame);
+
+function stop(){
+  if (dead) return;
+  dead = true;
+  if (rafId) cancelAnimationFrame(rafId);
+  musicStop();
+  try { if (AC) AC.close(); } catch(e){}
+  AC = null;
+  A.master = A.music = A.sfx = A.comp = A.noise = null;
+  AB.abort();
+  root.innerHTML = '';
+}
+
+return { stop: stop, _s: function(){ return S; }, _keys: keys };
+}
+
+/* ---------- мініатюра ---------- */
+function thumbKaras2(c, w, h, t){
+  c.fillStyle = '#171c1a'; c.fillRect(0, 0, w, h);
+  c.strokeStyle = 'rgba(242,237,227,0.05)'; c.lineWidth = 1;
+  for (var x = 0; x < w; x += 26) { c.beginPath(); c.moveTo(x + .5, 0); c.lineTo(x + .5, h); c.stroke(); }
+  for (var y = 0; y < h; y += 26) { c.beginPath(); c.moveTo(0, y + .5); c.lineTo(w, y + .5); c.stroke(); }
+
+  function bl(X, Y, r, sd){
+    c.beginPath();
+    for (var a = 0; a < 9; a++) {
+      var an = a / 9 * Math.PI * 2;
+      var rr = r * (0.72 + (Math.abs(Math.sin((sd + a) * 12.9) * 43758.5) % 1) * 0.55);
+      var px = X + Math.cos(an) * rr, py = Y + Math.sin(an) * rr;
+      if (a === 0) c.moveTo(px, py); else c.lineTo(px, py);
+    }
+    c.closePath(); c.fill();
+  }
+
+  c.fillStyle = 'rgba(238,238,232,0.22)';
+  for (var s = 0; s < 7; s++) {
+    bl(w * (0.15 + (s * 0.13) % 0.75), h * (0.2 + (s * 0.29) % 0.7), h * 0.07, s * 3.1);
+  }
+
+  var cx = w * 0.5, cy = h * 0.54, R = Math.min(w, h);
+  // вороги по колу
+  for (var i = 0; i < 6; i++) {
+    var ang = t * 0.5 + i * (Math.PI * 2 / 6);
+    var dd = R * (0.40 - 0.07 * Math.sin(t * 0.9 + i));
+    var ex = cx + Math.cos(ang) * dd, ey = cy + Math.sin(ang) * dd * 0.72;
+    var th = Math.sin(t * 6 + i * 1.3);
+    c.save(); c.translate(ex, ey); c.rotate(Math.atan2(cy - ey, cx - ex));
+    var alien = i % 2 === 1;
+    c.fillStyle = alien ? '#5d4f8e' : '#456530';
+    c.beginPath(); c.roundRect ? c.roundRect(th * 5 - 5, -5, 11, 10, 4) : c.rect(th * 5 - 5, -5, 11, 10);
+    c.fill();
+    c.fillStyle = alien ? '#a898d8' : '#79a252';
+    c.beginPath(); c.arc(-th * 1.5 + 2, 0, alien ? 6 : 5, 0, 6.2832); c.fill();
+    c.restore();
+  }
+  // карась у центрі
+  c.save(); c.translate(cx, cy); c.rotate(Math.sin(t * 0.7) * 0.5);
+  c.fillStyle = 'rgba(216,124,56,0.9)';
+  c.beginPath(); c.moveTo(-8, 0); c.lineTo(-20, -8); c.quadraticCurveTo(-14, 0, -20, 8); c.closePath(); c.fill();
+  var bg = c.createLinearGradient(0, -9, 0, 9);
+  bg.addColorStop(0, '#8c8c3e'); bg.addColorStop(0.5, '#d3ab55'); bg.addColorStop(1, '#8c8c3e');
+  c.fillStyle = bg;
+  c.beginPath(); c.ellipse(0, 0, 13, 8, 0, 0, 6.2832); c.fill();
+  c.fillStyle = '#2b3140'; c.fillRect(11, -2, 13, 4);
+  c.fillStyle = '#ffffff';
+  for (var b2 = 0; b2 < 3; b2++) {
+    var d2 = ((t * 120 + b2 * 34) % 70);
+    bl(24 + d2, 0, 4.5, b2 * 5.3);
+  }
+  c.restore();
 }
 
 })();
