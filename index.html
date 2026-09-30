@@ -1,4 +1,4 @@
-<title>Карась Тікає</title>
+<title>Аркада Карася</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Rubik:wght@400;500;700&display=swap">
 <style>
 /* Layout: full-bleed canvas road with a thin HUD rail pinned to the top and centered modal cards. */
@@ -70,60 +70,335 @@ canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
   .note{margin-top:10px}
 }
 @media (prefers-reduced-motion:reduce){#heatFill{transition:none}}
+
+/* Layout: каталог — сітка карток над повноекранною сценою, у яку монтується гра. */
+#app{position:relative;height:100%;width:100%;overflow:hidden}
+
+#menu{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:26px;padding:0 16px;padding-block:clamp(26px,6vh,54px);background:
+  radial-gradient(120% 80% at 50% -10%, rgba(217,118,74,.22), transparent 60%),
+  radial-gradient(90% 60% at 12% 105%, rgba(94,109,58,.20), transparent 62%),
+  var(--night)}
+.mhead{max-width:640px;margin:0 auto;text-align:center;display:flex;flex-direction:column;gap:9px}
+.eyebrow{margin:0;font-family:var(--font-d);font-size:10px;font-weight:700;letter-spacing:.34em;text-transform:uppercase;color:rgba(245,199,74,.72)}
+.mtitle{margin:0;font-family:var(--font-d);font-weight:900;font-size:clamp(30px,8vw,52px);line-height:.96;letter-spacing:-.02em;color:var(--paper);text-wrap:balance}
+.mtitle em{font-style:normal;color:var(--gold)}
+.mlede{margin:0;font-size:14px;line-height:1.55;color:rgba(242,237,227,.64);text-wrap:balance}
+
+.tiles{width:100%;max-width:820px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(248px,1fr));gap:16px}
+
+.tile{position:relative;display:flex;flex-direction:column;min-width:0;text-align:left;padding:0;overflow:hidden;border-radius:16px;
+  background:linear-gradient(168deg,rgba(24,29,52,.95),rgba(10,13,26,.97));
+  border:1px solid rgba(242,237,227,.13);color:var(--paper);font-family:var(--font-b);cursor:pointer;
+  transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+.tile:hover,.tile:focus-visible{transform:translateY(-3px);border-color:rgba(245,199,74,.55);box-shadow:0 16px 40px rgba(0,0,0,.45)}
+.tile:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+.tile .thumb{display:block;width:100%;aspect-ratio:16/9;max-width:100%;background:#0b0e1c;border-bottom:1px solid rgba(242,237,227,.1)}
+.tbody{display:flex;flex-direction:column;gap:9px;padding:15px 16px 16px;min-width:0}
+.tbody h2{margin:0;font-family:var(--font-d);font-weight:700;font-size:18px;line-height:1.1;color:var(--gold)}
+.tbody p{margin:0;font-size:12.5px;line-height:1.5;color:rgba(242,237,227,.68)}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chips span{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:rgba(242,237,227,.6);background:rgba(242,237,227,.07);border:1px solid rgba(242,237,227,.1);border-radius:99px;padding:3px 8px}
+.trow{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-top:2px}
+.tbest{font-size:11px;color:rgba(242,237,227,.5);font-variant-numeric:tabular-nums}
+.tplay{font-family:var(--font-d);font-weight:700;font-size:12px;color:var(--gold)}
+
+.tile.soon{cursor:default;border-style:dashed;border-color:rgba(242,237,227,.16);background:rgba(16,20,38,.55)}
+.tile.soon:hover{transform:none;box-shadow:none;border-color:rgba(242,237,227,.16)}
+.tile.soon .tbody h2{color:rgba(242,237,227,.62)}
+.tile.soon .tplay{color:rgba(242,237,227,.38)}
+
+.mfoot{max-width:640px;margin:0 auto;text-align:center;font-size:11.5px;line-height:1.6;color:rgba(242,237,227,.42)}
+
+#stage{position:absolute;inset:0}
+.back{position:absolute;left:16px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:5;
+  font-family:var(--font-b);font-size:12px;font-weight:500;color:var(--paper);
+  background:rgba(10,13,26,.6);border:1px solid rgba(242,237,227,.2);border-radius:9px;padding:8px 12px;cursor:pointer;backdrop-filter:blur(7px)}
+.back:hover{border-color:var(--gold);color:var(--gold)}
+.back:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+@media (max-width:430px){.back{padding:7px 10px;font-size:11px}}
 </style>
 
-<div id="wrap">
-  <canvas id="cv"></canvas>
+<div id="app">
+  <main id="menu">
+    <header class="mhead">
+      <p class="eyebrow">Аркада</p>
+      <h1 class="mtitle">Аркада <em>Карася</em></h1>
+      <p class="mlede">Маленькі браузерні ігри, які запускаються з одного файлу й не просять нічого встановлювати. Обери, у що бігти.</p>
+    </header>
+    <div class="tiles" id="tiles"></div>
+    <footer class="mfoot">Рекорди зберігаються у твоєму браузері й нікуди не надсилаються. Звук вмикається всередині гри.</footer>
+  </main>
 
-  <div id="hud">
-    <div class="bar">
-      <div class="stat"><span class="lbl">Монети</span><span class="val" id="vCoins">0</span></div>
-      <div class="stat mid"><span class="lbl">Метрів</span><span class="val big" id="vDist">0</span></div>
-      <div class="stat"><span class="lbl">Рекорд</span><span class="val" id="vBest">0</span></div>
-    </div>
-    <div class="heat"><span class="hlbl">Бус</span><div class="track"><div id="heatFill"></div></div></div>
-    <div class="tools">
-      <button id="bSound" class="tbtn" type="button">Звук: вимк.</button>
-      <button id="bPause" class="tbtn" type="button">Пауза</button>
-    </div>
-  </div>
-
-  <div id="overlay">
-    <div class="card" id="scrStart">
-      <h1>Карась Тікає</h1>
-      <p class="tag">Карась відростив ноги, взув кеди і вибіг на трасу. Позаду — чорний бус. Три ряди, монети під ногами, і жодної причини зупинятися.</p>
-      <div class="keys">
-        <b>← →</b><span>перебігти в сусідній ряд</span>
-        <b>↑ / Пробіл</b><span>стрибок через калюжу</span>
-        <b>↓</b><span>підкат під шлагбаум</span>
-        <b>Свайп</b><span>те саме на телефоні</span>
-      </div>
-      <button class="go" id="bStart" type="button">Бігти</button>
-      <p class="note">Бак зверху — наскільки близько бус. Зіткнення підпускає його ближче, монети й чистий біг відривають.</p>
-    </div>
-
-    <div class="card" id="scrOver" hidden>
-      <h2>Бус наздогнав</h2>
-      <p class="tag" id="overLine">Карась пішов на шашлик.</p>
-      <div class="res">
-        <div><span class="lbl">Метрів</span><span class="val" id="rDist">0</span></div>
-        <div><span class="lbl">Монет</span><span class="val" id="rCoins">0</span></div>
-        <div><span class="lbl">Рахунок</span><span class="val" id="rScore">0</span></div>
-      </div>
-      <button class="go" id="bAgain" type="button">Ще раз</button>
-      <p class="note" id="bestNote"></p>
-    </div>
-
-    <div class="card" id="scrPause" hidden>
-      <h2 style="color:var(--gold)">Пауза</h2>
-      <p class="tag">Бус теж стоїть. Поки що.</p>
-      <button class="go" id="bResume" type="button">Далі</button>
-    </div>
-  </div>
+  <section id="stage" hidden>
+    <div id="wrap"></div>
+    <button id="bBack" class="back" type="button">← Ігри</button>
+  </section>
 </div>
 
 <script>
 (function(){
+'use strict';
+
+var KARAS_TPL = "<canvas id=\"cv\"></canvas>\n\n  <div id=\"hud\">\n    <div class=\"bar\">\n      <div class=\"stat\"><span class=\"lbl\">Монети</span><span class=\"val\" id=\"vCoins\">0</span></div>\n      <div class=\"stat mid\"><span class=\"lbl\">Метрів</span><span class=\"val big\" id=\"vDist\">0</span></div>\n      <div class=\"stat\"><span class=\"lbl\">Рекорд</span><span class=\"val\" id=\"vBest\">0</span></div>\n    </div>\n    <div class=\"heat\"><span class=\"hlbl\">Бус</span><div class=\"track\"><div id=\"heatFill\"></div></div></div>\n    <div class=\"tools\">\n      <button id=\"bSound\" class=\"tbtn\" type=\"button\">Звук: вимк.</button>\n      <button id=\"bPause\" class=\"tbtn\" type=\"button\">Пауза</button>\n    </div>\n  </div>\n\n  <div id=\"overlay\">\n    <div class=\"card\" id=\"scrStart\">\n      <h1>Карась Тікає</h1>\n      <p class=\"tag\">Три ряди, монети під ногами і жодної причини зупинятися.</p>\n      <div class=\"keys\">\n        <b>← →</b><span>перебігти в сусідній ряд</span>\n        <b>↑ / Пробіл</b><span>стрибок через калюжу</span>\n        <b>↓</b><span>підкат під шлагбаум</span>\n        <b>Свайп</b><span>те саме на телефоні</span>\n      </div>\n      <button class=\"go\" id=\"bStart\" type=\"button\">Бігти</button>\n      <p class=\"note\">Бак зверху — наскільки близько бус. Зіткнення підпускає його ближче, монети й чистий біг відривають.</p>\n    </div>\n\n    <div class=\"card\" id=\"scrOver\" hidden>\n      <h2>Бус наздогнав</h2>\n      <p class=\"tag\" id=\"overLine\">Карась пішов на шашлик.</p>\n      <div class=\"res\">\n        <div><span class=\"lbl\">Метрів</span><span class=\"val\" id=\"rDist\">0</span></div>\n        <div><span class=\"lbl\">Монет</span><span class=\"val\" id=\"rCoins\">0</span></div>\n        <div><span class=\"lbl\">Рахунок</span><span class=\"val\" id=\"rScore\">0</span></div>\n      </div>\n      <button class=\"go\" id=\"bAgain\" type=\"button\">Ще раз</button>\n      <p class=\"note\" id=\"bestNote\"></p>\n    </div>\n\n    <div class=\"card\" id=\"scrPause\" hidden>\n      <h2 style=\"color:var(--gold)\">Пауза</h2>\n      <p class=\"tag\">Бус теж стоїть. Поки що.</p>\n      <button class=\"go\" id=\"bResume\" type=\"button\">Далі</button>\n    </div>\n  </div>";
+
+/* ---------- каталог ---------- */
+var GAMES = [
+  {
+    id: 'karas',
+    title: 'Карась Тікає',
+    lede: 'Карась відростив ноги, взув кеди і вибіг на трасу. Збирай монети, ухиляйся від баків, калюж і шлагбаумів — позаду чорний бус.',
+    chips: ['Раннер', 'Три ряди', 'Клавіші або свайпи'],
+    bestKey: 'karas.best',
+    create: createKaras,
+    thumb: thumbKaras
+  },
+  {
+    id: 'soon',
+    soon: true,
+    title: 'Друга гра',
+    lede: 'Місце вже підготовлене: нова гра додається одним записом у каталозі й окремою функцією поруч із цією.',
+    chips: ['У роботі'],
+    thumb: thumbSoon
+  }
+];
+
+var elTiles = document.getElementById('tiles');
+var elMenu = document.getElementById('menu');
+var elStage = document.getElementById('stage');
+var elWrap = document.getElementById('wrap');
+var elBack = document.getElementById('bBack');
+var live = null, liveId = '';
+var thumbs = [], thumbRaf = 0;
+var SHELL_REDUCE = false;
+try { SHELL_REDUCE = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch(e){}
+
+function bestOf(key){
+  if (!key) return null;
+  try { return parseInt(localStorage.getItem(key) || '0', 10) || 0; } catch(e){ return 0; }
+}
+function esc(t){ return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+function renderTiles(){
+  var html = '';
+  GAMES.forEach(function(gm){
+    var tag = gm.soon ? 'div' : 'button';
+    var attrs = gm.soon ? ' class="tile soon"' : ' class="tile" type="button" data-id="' + gm.id + '"';
+    var b = bestOf(gm.bestKey);
+    html += '<' + tag + attrs + '>' +
+      '<canvas class="thumb" data-thumb="' + gm.id + '"></canvas>' +
+      '<div class="tbody">' +
+        '<h2>' + esc(gm.title) + '</h2>' +
+        '<p>' + esc(gm.lede) + '</p>' +
+        '<div class="chips">' + gm.chips.map(function(c){ return '<span>' + esc(c) + '</span>'; }).join('') + '</div>' +
+        '<div class="trow">' +
+          '<span class="tbest">' + (gm.soon ? 'Скоро' : (b ? 'Рекорд ' + b : 'Ще без рекорду')) + '</span>' +
+          '<span class="tplay">' + (gm.soon ? '—' : 'Грати →') + '</span>' +
+        '</div>' +
+      '</div>' +
+    '</' + tag + '>';
+  });
+  elTiles.innerHTML = html;
+
+  thumbs = [];
+  GAMES.forEach(function(gm){
+    var c = elTiles.querySelector('[data-thumb="' + gm.id + '"]');
+    if (c) thumbs.push({ el: c, ctx: c.getContext('2d'), draw: gm.thumb });
+  });
+
+  Array.prototype.forEach.call(elTiles.querySelectorAll('.tile[data-id]'), function(btn){
+    btn.addEventListener('click', function(){ openGame(btn.getAttribute('data-id')); });
+  });
+}
+
+function paintThumbs(t){
+  for (var i = 0; i < thumbs.length; i++) {
+    var th = thumbs[i];
+    var r = th.el.getBoundingClientRect();
+    if (r.width < 2) continue;
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    var w = Math.round(r.width), h = Math.round(r.height);
+    if (th.el.width !== Math.round(w * dpr)) { th.el.width = Math.round(w * dpr); th.el.height = Math.round(h * dpr); }
+    th.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    th.draw(th.ctx, w, h, t);
+  }
+}
+function thumbLoop(now){
+  if (elMenu.hidden) { thumbRaf = 0; return; }
+  paintThumbs(now / 1000);
+  thumbRaf = requestAnimationFrame(thumbLoop);
+}
+function startThumbs(){
+  if (SHELL_REDUCE) { paintThumbs(0); return; }
+  if (!thumbRaf) thumbRaf = requestAnimationFrame(thumbLoop);
+}
+
+/* ---------- запуск і вихід ---------- */
+function openGame(id){
+  var gm = null;
+  for (var i = 0; i < GAMES.length; i++) if (GAMES[i].id === id) gm = GAMES[i];
+  if (!gm || gm.soon || !gm.create) return;
+  closeGame(true);
+  elMenu.hidden = true;
+  elStage.hidden = false;
+  liveId = id;
+  live = gm.create(elWrap);
+  try { if (location.hash !== '#' + id) location.hash = id; } catch(e){}
+}
+function closeGame(quiet){
+  if (live) { try { live.stop(); } catch(e){} live = null; }
+  liveId = '';
+  elStage.hidden = true;
+  elMenu.hidden = false;
+  if (!quiet) {
+    renderTiles();
+    startThumbs();
+    try { if (location.hash) location.hash = ''; } catch(e){}
+  }
+}
+elBack.addEventListener('click', function(){ closeGame(false); });
+window.addEventListener('hashchange', function(){
+  var h = (location.hash || '').replace('#', '');
+  if (!h && liveId) closeGame(false);
+  else if (h && h !== liveId) openGame(h);
+});
+
+/* ---------- мініатюри ---------- */
+function thumbKaras(c, w, h, t){
+  var hz = h * 0.44;
+  var sky = c.createLinearGradient(0, 0, 0, hz);
+  sky.addColorStop(0, '#0b0e1c'); sky.addColorStop(0.62, '#3a2f54'); sky.addColorStop(1, '#d9764a');
+  c.fillStyle = sky; c.fillRect(0, 0, w, hz);
+  c.fillStyle = '#f6e6c3';
+  c.beginPath(); c.arc(w * 0.80, hz * 0.34, h * 0.035, 0, 6.2832); c.fill();
+  c.fillStyle = '#171a2e';
+  for (var b = 0; b < 14; b++) {
+    var sd = Math.abs(Math.sin(b * 2.3 + 0.7) * 43758.5453 % 1);
+    c.fillRect(b * (w / 13) - 6, hz - (8 + sd * 26), 14 + sd * 16, 30);
+  }
+  var gr = c.createLinearGradient(0, hz, 0, h);
+  gr.addColorStop(0, '#1d2a28'); gr.addColorStop(1, '#25352c');
+  c.fillStyle = gr; c.fillRect(0, hz, w, h - hz);
+
+  c.fillStyle = '#2c3140';
+  c.beginPath();
+  c.moveTo(w * 0.42, hz); c.lineTo(w * 0.58, hz);
+  c.lineTo(w * 1.16, h); c.lineTo(-w * 0.16, h);
+  c.closePath(); c.fill();
+
+  var scroll = (t * 0.55) % 1;
+  for (var i = 0; i < 7; i++) {
+    var k = (i + scroll) / 7;
+    var e = k * k;
+    var yy = hz + (h - hz) * e;
+    var half = (w * 0.08 + (w * 0.66 - w * 0.08) * e);
+    var dh = Math.max(1, (h - hz) * 0.035 * (0.25 + e));
+    c.fillStyle = 'rgba(230,220,196,' + (0.18 + e * 0.5).toFixed(2) + ')';
+    c.fillRect(w * 0.5 - half * 0.34, yy, half * 0.07, dh);
+    c.fillRect(w * 0.5 + half * 0.27, yy, half * 0.07, dh);
+  }
+
+  // монети
+  for (var m = 0; m < 3; m++) {
+    var mk = ((t * 0.55 + m * 0.33) % 1);
+    var me = mk * mk;
+    var my = hz + (h - hz) * me * 0.86;
+    var mr = Math.max(1.2, h * 0.02 * (0.3 + me * 1.5));
+    c.fillStyle = '#f5c74a';
+    c.beginPath(); c.ellipse(w * 0.365 - (w * 0.10) * me, my, mr * Math.abs(Math.cos(t * 3 + m)) + mr * 0.2, mr, 0, 0, 6.2832); c.fill();
+  }
+
+  // фари буса знизу
+  var d = 0.55 + 0.45 * Math.sin(t * 0.8);
+  c.save();
+  c.globalCompositeOperation = 'lighter';
+  [-1, 1].forEach(function(sgn){
+    var ox = w * 0.5 + sgn * w * 0.20;
+    var bg = c.createLinearGradient(ox, h, w * 0.5 + sgn * w * 0.04, hz);
+    bg.addColorStop(0, 'rgba(255,214,150,' + (0.22 + d * 0.16).toFixed(2) + ')');
+    bg.addColorStop(1, 'rgba(255,214,150,0)');
+    c.fillStyle = bg;
+    c.beginPath();
+    c.moveTo(ox - w * 0.07, h); c.lineTo(ox + w * 0.07, h);
+    c.lineTo(w * 0.5 + sgn * w * 0.05, hz); c.lineTo(w * 0.5 + sgn * w * 0.01, hz);
+    c.closePath(); c.fill();
+  });
+  c.restore();
+  c.fillStyle = '#05060a';
+  c.fillRect(w * 0.16, h - h * 0.10, w * 0.68, h * 0.12);
+  [-1, 1].forEach(function(sgn){
+    c.fillStyle = '#ffe9bd';
+    c.fillRect(w * 0.5 + sgn * w * 0.26 - w * 0.05, h - h * 0.075, w * 0.10, h * 0.026);
+  });
+
+  // карась
+  var fx = w * 0.5, fy = h * 0.80, u = h * 0.30;
+  var run = t * 11;
+  c.save(); c.translate(fx, fy);
+  c.lineCap = 'round';
+  [-1, 1].forEach(function(sgn){
+    var ph = run + (sgn > 0 ? Math.PI : 0);
+    var lx = sgn * 0.12 * u + Math.cos(ph) * 0.17 * u;
+    var ly = -Math.max(0, Math.sin(ph)) * 0.2 * u;
+    c.strokeStyle = '#c99c46'; c.lineWidth = 0.09 * u;
+    c.beginPath(); c.moveTo(sgn * 0.12 * u, -0.38 * u); c.lineTo(lx, ly); c.stroke();
+    c.fillStyle = '#f2ede3';
+    c.beginPath(); c.ellipse(lx + 0.03 * u, ly - 0.03 * u, 0.11 * u, 0.045 * u, 0, 0, 6.2832); c.fill();
+  });
+  c.translate(0, -0.60 * u + Math.sin(run * 2) * u * 0.02);
+  c.fillStyle = 'rgba(216,124,56,0.92)';
+  c.beginPath();
+  c.moveTo(-0.24 * u, 0.02 * u); c.lineTo(-0.62 * u, -0.27 * u);
+  c.quadraticCurveTo(-0.47 * u, 0.02 * u, -0.62 * u, 0.29 * u);
+  c.closePath(); c.fill();
+  c.fillStyle = '#7a8b3c';
+  c.beginPath();
+  c.moveTo(-0.19 * u, -0.28 * u); c.quadraticCurveTo(-0.04 * u, -0.56 * u, 0.09 * u, -0.37 * u);
+  c.quadraticCurveTo(0.15 * u, -0.48 * u, 0.18 * u, -0.30 * u); c.closePath(); c.fill();
+  var bd = c.createLinearGradient(0, -0.42 * u, 0, 0.38 * u);
+  bd.addColorStop(0, '#54632d'); bd.addColorStop(0.36, '#8c8c3e');
+  bd.addColorStop(0.68, '#d3ab55'); bd.addColorStop(1, '#f0dda6');
+  c.fillStyle = bd;
+  c.beginPath();
+  c.moveTo(-0.30 * u, -0.12 * u);
+  c.bezierCurveTo(-0.24 * u, -0.40 * u, 0.08 * u, -0.44 * u, 0.27 * u, -0.25 * u);
+  c.bezierCurveTo(0.42 * u, -0.14 * u, 0.44 * u, 0.06 * u, 0.31 * u, 0.17 * u);
+  c.bezierCurveTo(0.14 * u, 0.37 * u, -0.16 * u, 0.39 * u, -0.30 * u, 0.18 * u);
+  c.closePath(); c.fill();
+  c.fillStyle = '#f7f3ea';
+  c.beginPath(); c.arc(0.25 * u, -0.13 * u, 0.082 * u, 0, 6.2832); c.fill();
+  c.fillStyle = '#14161f';
+  c.beginPath(); c.arc(0.275 * u, -0.12 * u, 0.042 * u, 0, 6.2832); c.fill();
+  c.restore();
+}
+
+function thumbSoon(c, w, h, t){
+  c.fillStyle = '#0d1020'; c.fillRect(0, 0, w, h);
+  c.strokeStyle = 'rgba(242,237,227,0.10)'; c.lineWidth = 1;
+  for (var x = 0; x < w; x += 22) { c.beginPath(); c.moveTo(x + 0.5, 0); c.lineTo(x + 0.5, h); c.stroke(); }
+  for (var y = 0; y < h; y += 22) { c.beginPath(); c.moveTo(0, y + 0.5); c.lineTo(w, y + 0.5); c.stroke(); }
+  var pulse = 0.35 + 0.2 * Math.sin(t * 1.6);
+  c.strokeStyle = 'rgba(245,199,74,' + pulse.toFixed(2) + ')';
+  c.setLineDash([7, 6]); c.lineWidth = 1.6;
+  c.strokeRect(w * 0.5 - h * 0.26, h * 0.5 - h * 0.26, h * 0.52, h * 0.52);
+  c.setLineDash([]);
+  c.fillStyle = 'rgba(242,237,227,' + (0.30 + pulse * 0.4).toFixed(2) + ')';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.font = '700 ' + (h * 0.26).toFixed(0) + 'px Unbounded, Trebuchet MS, sans-serif';
+  c.fillText('?', w * 0.5, h * 0.52);
+  c.textAlign = 'start'; c.textBaseline = 'alphabetic';
+}
+
+/* ---------- старт ---------- */
+renderTiles();
+startThumbs();
+window.addEventListener('resize', function(){ if (!elMenu.hidden) paintThumbs(performance.now() / 1000); });
+(function(){
+  var h = (location.hash || '').replace('#', '');
+  if (h) openGame(h);
+})();
+
+
+function createKaras(root){
 'use strict';
 
 /* ---------- світ ---------- */
@@ -133,7 +408,10 @@ var GRAV = 2700, JUMP_V = 990;
 var GAP_MAX = 42, GAP_START = 30, HIT_COST = 11;
 var FISH_H = 104;
 
-var wrap = document.getElementById('wrap');
+var wrap = root;
+root.innerHTML = KARAS_TPL;
+var AB = new AbortController(), SIG = { signal: AB.signal };
+var PASS = { passive: true, signal: AB.signal };
 var cv = document.getElementById('cv');
 var g = cv.getContext('2d');
 var W = 0, H = 0, DPR = 1, horizon = 0, focal = 0;
@@ -148,7 +426,7 @@ function resize(){
   horizon = H * 0.355;
   focal = Math.min(H * 0.64, W * 0.74);
 }
-window.addEventListener('resize', resize);
+window.addEventListener('resize', resize, SIG);
 
 /* ---------- стан ---------- */
 var S;
@@ -400,12 +678,12 @@ window.addEventListener('keydown', function(e){
   }
   else if (k === 'ArrowDown' || k === 's' || k === 'S') { duck(); e.preventDefault(); }
   else if (k === 'Escape' || k === 'p' || k === 'P') { togglePause(); }
-});
+}, SIG);
 
 var tsx = 0, tsy = 0;
 wrap.addEventListener('touchstart', function(e){
   var p = e.changedTouches[0]; tsx = p.clientX; tsy = p.clientY;
-}, { passive: true });
+}, PASS);
 wrap.addEventListener('touchend', function(e){
   var p = e.changedTouches[0];
   var dx = p.clientX - tsx, dy = p.clientY - tsy;
@@ -413,7 +691,7 @@ wrap.addEventListener('touchend', function(e){
   if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 1 : -1);
   else if (dy < 0) jump();
   else duck();
-}, { passive: true });
+}, PASS);
 
 /* ---------- генерація траси ---------- */
 function shuffled(){
@@ -1307,15 +1585,16 @@ bSound.addEventListener('click', function(){
   if (sound && S.mode === 'play') { musicStart(); engineOn(); }
 });
 syncSoundBtn();
-window.addEventListener('blur', function(){ if (S.mode === 'play') togglePause(); });
+window.addEventListener('blur', function(){ if (S.mode === 'play') togglePause(); }, SIG);
 document.addEventListener('visibilitychange', function(){
   if (document.hidden) { if (S.mode === 'play') togglePause(); }
   else if (sound) ac();
-});
+}, SIG);
 
 /* ---------- цикл ---------- */
-var last = 0, hudT = 0;
+var last = 0, hudT = 0, rafId = 0, dead = false;
 function frame(now){
+  if (dead) return;
   if (!last) last = now;
   var dt = (now - last) / 1000;
   last = now;
@@ -1325,25 +1604,28 @@ function frame(now){
   draw();
   hudT += dt;
   if (hudT > 0.08) { hudT = 0; syncHud(); }
-  requestAnimationFrame(frame);
+  rafId = requestAnimationFrame(frame);
 }
 
 resize();
 syncHud();
-requestAnimationFrame(frame);
+rafId = requestAnimationFrame(frame);
 
-/* збереження стану для гравців, у яких сторінка відкрита під час оновлення */
-try {
-  var hot = window.claude && window.claude.hot;
-  if (hot) {
-    hot.snapshot(function(){ return { best: best, sound: sound }; });
-    var boot = function(data){
-      if (data && typeof data.best === 'number' && data.best > best) { best = data.best; syncHud(); }
-      if (data && typeof data.sound === 'boolean') { sound = data.sound; syncSoundBtn(); }
-    };
-    if (hot.ready) hot.ready(boot); else boot(hot.data || {});
-  }
-} catch(e){}
+function stop(){
+  if (dead) return;
+  dead = true;
+  if (rafId) cancelAnimationFrame(rafId);
+  musicStop();
+  engineOff();
+  try { if (AC) AC.close(); } catch(e){}
+  AC = null;
+  A.master = A.music = A.sfx = A.comp = A.noise = null;
+  AB.abort();
+  root.innerHTML = '';
+}
+
+return { stop: stop };
+}
 
 })();
 </script>
