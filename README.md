@@ -2,7 +2,7 @@
 
 Веб-раннер у три ряди. Карась на ногах збирає монети, ухиляється від перешкод і тікає від чорного буса.
 
-**Грати:** https://ivan-lutskyi.github.io/karas-tikaye/
+**Грати:** https://ramen-ichiraku.github.io/karas-tikaye/
 
 ## Керування
 
