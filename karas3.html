@@ -166,12 +166,13 @@ canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
       <div class="keys">
         <b>WASD</b><span>рух</span>
         <b>Миша</b><span>камера</span>
+        <b>Пробіл</b><span>перекат; утримувати — біг</span>
+        <b>F</b><span>стрибок</span>
         <b>ЛКМ</b><span>удар</span>
+        <b>Shift + ЛКМ</b><span>важкий удар</span>
         <b>ПКМ</b><span>блок</span>
-        <b>Пробіл</b><span>перекат, з розбігу — стрибок</span>
-        <b>Shift</b><span>біг</span>
-        <b>Q</b><span>захоплення цілі</span>
-        <b>R</b><span>ковток розсолу</span>
+        <b>Колесо миші / Tab</b><span>захоплення цілі</span>
+        <b>Q</b><span>ковток розсолу</span>
         <b>E</b><span>дія: двері, вогнище, ікра</span>
       </div>
       <button class="go" id="bGo" type="button">Прокинутися</button>
@@ -220,22 +221,24 @@ if (typeof THREE === 'undefined') {
 
 /* ================= налаштування ================= */
 var LOWFX = /(\?|&)fx=low/.test(location.search);
-var RIM = 112, EDGE = 120;               // де починається круча і де стіна
+var RIM = 130, EDGE = 140;               // де починається круча і де стіна
 var GRAV = 24, PR = 0.44;                // тяжіння і радіус гравця
 var WALK = 3.6, RUN = 6.4;
 
-var CHAPEL = { x: 0, z: 52 };
-var GX = 24;                             // вісь ущелини
-var CAVE   = { x: GX, z: -66 };
-var ARENA  = { x: GX, z: -96, r: 17 };   // зала боса
-var MASSIF = { x: GX, z: -88, r: 44 };
-var GORGE  = { z0: -58, z1: -82 };       // прохід крізь масив
+var CHAPEL = { x: 0, z: 86 };
+var GX = 26;                             // вісь ущелини
+var CAVE   = { x: GX, z: -70 };
+var ARENA  = { x: GX, z: -104, r: 18 };  // зала боса
+var MASSIF = { x: GX, z: -96, r: 48 };
+var GORGE  = { z0: -60, z1: -86 };       // прохід крізь масив
+var RIVER_Z = -6;                        // сухе русло
+var BRIDGE = null;
 var FIRES = [
-  { x: -6, z: 36, name: 'Вогнище біля каплиці' },
-  { x: 20, z: -50, name: 'Вогнище перед ущелиною' }
+  { x: -5, z: 70, name: 'Вогнище біля каплиці' },
+  { x: 22, z: -52, name: 'Вогнище перед ущелиною' }
 ];
 var FIRE = FIRES[0];
-var ROAD = [[0,46],[4,22],[-8,-2],[0,-26],[12,-44],[22,-56]];
+var ROAD = [[0,80],[3,56],[-4,34],[6,14],[4,-6],[2,-24],[12,-40],[20,-52],[26,-62]];
 
 /* ================= рушій ================= */
 var renderer = new THREE.WebGLRenderer({ antialias: !LOWFX, powerPreference: 'high-performance' });
@@ -296,7 +299,13 @@ function hAt(x, z){
   h = h * (1 - rd * 0.9) - rd * 0.22;
   // майданчик каплиці
   var cd = Math.hypot(x - CHAPEL.x, z - CHAPEL.z);
-  if (cd < 11) h = h * (cd / 11) + 0.15 * (1 - cd / 11);
+  if (cd < 12) h = h * (cd / 12) + 0.15 * (1 - cd / 12);
+  // селище стоїть на рівному
+  var vd = Math.hypot(x - 22, z - 20);
+  if (vd < 17) { var kv = Math.min(1, (17 - vd) / 9); h = h * (1 - kv) + 0.5 * kv; }
+  // сухе русло перетинає поле — міст через нього єдиний
+  var rv = Math.abs(z - RIVER_Z);
+  if (rv < 9.5) h -= Math.pow(1 - rv / 9.5, 1.3) * 4.2;
   // скельний масив, у якому ховається печера
   var kd = Math.hypot(x - MASSIF.x, z - MASSIF.z);
   if (kd < MASSIF.r) h += Math.pow(Math.max(0, 1 - kd / MASSIF.r), 1.55) * 13;
@@ -320,7 +329,7 @@ function hAt(x, z){
   return h;
 }
 
-var TSEG = 156, TSIZE = 300;
+var TSEG = 176, TSIZE = 340;
 var terGeo = new THREE.PlaneGeometry(TSIZE, TSIZE, TSEG, TSEG);
 terGeo.rotateX(-Math.PI / 2);
 (function(){
@@ -410,6 +419,7 @@ var M = {
   foeA:   mat(0x5e6b3c), foeB: mat(0x424e2c), foeSkin: mat(0x9aa06c),
   rust:   mat(0x7a4a2c), cloth: mat(0x3a3340),
   wood:   mat(0x46392c), dark: mat(0x1b1d22),
+  wall:   mat(0x6b6153), wallD: mat(0x4d463b),
   boss:   mat(0x6c6f4a), bossD: mat(0x3e4230), bossT: mat(0x8d7b3a, { emissive: 0x2b1f05 }),
   ember:  mat(0xff7a2a, { emissive: 0xc23c05 })
 };
@@ -427,7 +437,7 @@ function tok(e){
   if (k === 's' || k === 'і') return 'KeyS';
   if (k === 'd' || k === 'в') return 'KeyD';
   if (k === 'q' || k === 'й') return 'KeyQ';
-  if (k === 'r' || k === 'к') return 'KeyR';
+  if (k === 'f' || k === 'а') return 'KeyF';
   if (k === 'e' || k === 'у') return 'KeyE';
   if (k === 'p' || k === 'з') return 'KeyP';
   if (k === ' ') return 'Space';
@@ -440,7 +450,7 @@ window.addEventListener('keydown', function(e){
   var c = tok(e);
   keys[c] = 1;
   if (!pressed[c]) { pressed[c] = 1; onPress(c, e); }
-  if (['KeyW','KeyA','KeyS','KeyD','Space','KeyQ','KeyE','KeyR','ShiftLeft','Tab'].indexOf(c) >= 0) e.preventDefault();
+  if (['KeyW','KeyA','KeyS','KeyD','Space','KeyQ','KeyE','KeyF','ShiftLeft','Tab'].indexOf(c) >= 0) e.preventDefault();
 });
 window.addEventListener('keyup', function(e){ var c = tok(e); keys[c] = 0; pressed[c] = 0; });
 window.addEventListener('blur', function(){ keys = {}; pressed = {}; if (G.mode === 'play') pause(true); });
@@ -450,7 +460,8 @@ var cvs = renderer.domElement;
 cvs.addEventListener('mousedown', function(e){
   if (G.mode !== 'play') return;
   if (!mouse.locked && cvs.requestPointerLock) { cvs.requestPointerLock(); return; }
-  if (e.button === 0) { mouse.lmb = true; attack(); }
+  if (e.button === 0) { mouse.lmb = true; attack(!!keys.ShiftLeft); }
+  if (e.button === 1) { toggleLock(); e.preventDefault(); }
   if (e.button === 2) mouse.rmb = true;
 });
 window.addEventListener('mouseup', function(e){
@@ -595,8 +606,8 @@ var bigKaras;
 (function(){
   var G0 = new THREE.Group();
   // слабка самосвітність + власний ліхтар спереду: інакше силует зливається в пляму
-  var gm  = new THREE.MeshLambertMaterial({ color: 0xd9ad44, emissive: 0x36260a, fog: false });
-  var gm2 = new THREE.MeshLambertMaterial({ color: 0xf3dd93, emissive: 0x4d3a0d, fog: false });
+  var gm  = new THREE.MeshLambertMaterial({ color: 0xc9a03c, emissive: 0x241903, fog: false });
+  var gm2 = new THREE.MeshLambertMaterial({ color: 0xe6cf80, emissive: 0x33260a, fog: false });
   var gmD = new THREE.MeshLambertMaterial({ color: 0x8a6b22, emissive: 0x1d1405, fog: false });
   var gmF = new THREE.MeshLambertMaterial({ color: 0xe8be5c, emissive: 0x43310b, fog: false });
 
@@ -647,7 +658,7 @@ var bigKaras;
 
   // сяйво: раніше сфери були радіусом 180 і закривали пів екрана
   var halo = new THREE.Mesh(new THREE.SphereGeometry(34, 16, 12),
-    new THREE.MeshBasicMaterial({ color: 0xe8bf60, transparent: true, opacity: 0.028,
+    new THREE.MeshBasicMaterial({ color: 0xe8bf60, transparent: true, opacity: 0.02,
       fog: false, side: THREE.BackSide, depthWrite: false }));
   halo.scale.set(1, 1.25, 1);
   G0.add(halo);
@@ -655,13 +666,13 @@ var bigKaras;
 
   // горизонтально: вертикальна риба не вміщалась у кадр, було видно лише хвіст
   G0.rotation.set(0.08, 0.34, -Math.PI / 2 + 0.1);
-  G0.position.set(-28, 54, -250);
-  G0.scale.setScalar(1.5);
+  G0.position.set(-74, 88, -360);
+  G0.scale.setScalar(1.25);
   scene.add(G0);
   bigKaras = G0;
   // ліхтар стоїть перед рибою: сонце світить їй у спину, тож видимий бік був у тіні
-  var kl = new THREE.PointLight(0xffd88a, 3.4, 230, 1.4);
-  kl.position.set(-40, 70, -180);
+  var kl = new THREE.PointLight(0xffd88a, 1.9, 240, 1.5);
+  kl.position.set(-74, 94, -280);
   scene.add(kl);
 })();
 
@@ -671,7 +682,7 @@ var bigKaras;
   var v = [], c = [];
   for (var i = 0; i < 40; i++) {
     var a0 = i / 40 * Math.PI * 2, a1 = (i + 1) / 40 * Math.PI * 2;
-    var R = 330, hgt = 46 + Math.sin(i * 2.3) * 26 + Math.cos(i * 0.9) * 18;
+    var R = 390, hgt = 52 + Math.sin(i * 2.3) * 30 + Math.cos(i * 0.9) * 20;
     var x0 = Math.cos(a0) * R, z0 = Math.sin(a0) * R;
     var x1 = Math.cos(a1) * R, z1 = Math.sin(a1) * R;
     var mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
@@ -828,107 +839,381 @@ FIRES.forEach(function(F){
   fireObjs.push({ F: F, g: G0, flames: flames3, emb: emb, lit: false });
 });
 
-/* ================= рослинність і каміння ================= *//* ================= рослинність і каміння ================= */
+/* ================= орієнтири й забудова ================= */
+
+// спільні дрібниці
+function scatterRocks(cx, cz, rad, n, minS, maxS){
+  for (var i = 0; i < n; i++) {
+    var a = rnd() * 6.283, r = rnd() * rad;
+    var x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
+    var sc = minS + rnd() * (maxS - minS);
+    var m = new THREE.Mesh(new THREE.DodecahedronGeometry(sc, 0), M.stone);
+    m.position.set(x, hAt(x, z) + sc * 0.35, z);
+    m.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3);
+    m.scale.set(1, rr(0.5, 0.9), rr(0.8, 1.2));
+    m.castShadow = !LOWFX;
+    scene.add(m);
+    if (sc > 1.0) addWall(x, z, sc * 0.75, hAt(x, z) + sc * 1.1);
+  }
+}
+function deadTree(x, z, h){
+  var y = hAt(x, z);
+  var tr = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.46, h, 6), M.wood);
+  tr.position.set(x, y + h / 2, z);
+  tr.rotation.z = rr(-0.1, 0.1);
+  tr.castShadow = !LOWFX;
+  scene.add(tr);
+  addWall(x, z, 0.5, y + h);
+  for (var b = 0; b < 5; b++) {
+    var bl = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.14, 1.6 + rnd() * 1.8, 5), M.wood);
+    var ba = rnd() * 6.283;
+    bl.position.set(x + Math.cos(ba) * 0.7, y + h * (0.5 + rnd() * 0.45), z + Math.sin(ba) * 0.7);
+    bl.rotation.set(rr(-1, 1), ba, rr(-1.2, 1.2));
+    scene.add(bl);
+  }
+}
+
+/* --- зруйнований будинок --- */
+function ruinHouse(x, z, rot, w, d, hgt, gaps){
+  var y = hAt(x, z);
+  var g = new THREE.Group();
+  g.position.set(x, y, z);
+  g.rotation.y = rot;
+  scene.add(g);
+  var t = 0.5;
+  function seg(lx, lz, sw, sd, sh){
+    var m = new THREE.Mesh(new THREE.BoxGeometry(sw, sh, sd), M.wall);
+    m.position.set(lx, sh / 2, lz);
+    m.castShadow = !LOWFX; m.receiveShadow = !LOWFX;
+    g.add(m);
+    var c = Math.cos(rot), s2 = Math.sin(rot);
+    addBox(x + lx * c - lz * s2, z + lx * s2 + lz * c, sw / 2, sd / 2, rot, y + sh);
+  }
+  // чотири стіни з проломами
+  seg(-w / 2, 0, t, d, hgt * (gaps & 1 ? 0.45 : 1));
+  seg(w / 2, 0, t, d, hgt * (gaps & 2 ? 0.5 : 1));
+  seg(0, -d / 2, w, t, hgt * (gaps & 4 ? 0.4 : 1));
+  seg(0, d / 2, w * 0.35, t, hgt);
+  seg(w * 0.34, d / 2, w * 0.32, t, hgt * 0.6);
+  // уламки даху
+  for (var r = 0; r < 4; r++) {
+    var beam = new THREE.Mesh(new THREE.BoxGeometry(w * 0.9, 0.22, 0.24), M.wood);
+    beam.position.set(rr(-0.6, 0.6), hgt * rr(0.5, 0.95), -d / 2 + r * (d / 3.4));
+    beam.rotation.set(rr(-0.3, 0.3), rr(-0.2, 0.2), rr(-0.25, 0.25));
+    g.add(beam);
+  }
+  // підлога
+  var fl = new THREE.Mesh(new THREE.BoxGeometry(w, 0.2, d), M.wallD);
+  fl.position.y = 0.1; fl.receiveShadow = !LOWFX;
+  g.add(fl);
+  scatterRocks(x, z, Math.max(w, d) * 0.7, 5, 0.25, 0.6);
+}
+
+/* --- кістяк велетенської риби: головний орієнтир поля --- */
 (function(){
-  // сухі дерева
+  var bx = -34, bz = 44, by = hAt(bx, bz);
+  var g = new THREE.Group();
+  g.position.set(bx, by, bz);
+  g.rotation.y = 0.6;
+  scene.add(g);
+  var bone = new THREE.MeshLambertMaterial({ color: 0xcfc6ac });
+  // хребет
   for (var i = 0; i < 16; i++) {
-    var a = rnd() * Math.PI * 2, r = 16 + rnd() * 58;
-    var x = Math.cos(a) * r, z = Math.sin(a) * r;
-    if (roadDist(x, z) < 4 || Math.hypot(x - CHAPEL.x, z - CHAPEL.z) < 12) continue;
-    if (Math.hypot(x - ARENA.x, z - ARENA.z) < 22) continue;
-    var y = hAt(x, z), H = 4 + rnd() * 5;
-    var tr = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.42, H, 6), M.wood);
-    tr.position.set(x, y + H / 2, z);
-    tr.rotation.z = rr(-0.12, 0.12);
-    tr.castShadow = !LOWFX;
-    scene.add(tr);
-    addWall(x, z, 0.5, y + H);
-    for (var b = 0; b < 4; b++) {
-      var bl2 = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.13, 1.6 + rnd() * 1.6, 5), M.wood);
-      var ba = rnd() * Math.PI * 2;
-      bl2.position.set(x + Math.cos(ba) * 0.7, y + H * (0.55 + rnd() * 0.4), z + Math.sin(ba) * 0.7);
-      bl2.rotation.set(rr(-1, 1), ba, rr(-1.1, 1.1));
-      scene.add(bl2);
+    var v = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.6, 1.0), bone);
+    v.position.set(0, 3.6 - Math.pow((i - 7) / 8, 2) * 1.4, -11 + i * 1.5);
+    v.castShadow = !LOWFX;
+    g.add(v);
+  }
+  // ребра
+  for (var r = 0; r < 9; r++) {
+    var zz = -8 + r * 1.9;
+    var sc = 1 - Math.abs(r - 4) / 7;
+    [-1, 1].forEach(function(sd){
+      var rib = new THREE.Mesh(new THREE.TorusGeometry(2.6 * (0.5 + sc), 0.22, 5, 10, Math.PI * 0.85), bone);
+      rib.position.set(0, 3.4, zz);
+      rib.rotation.set(0, Math.PI / 2, sd > 0 ? 0.25 : Math.PI - 0.25);
+      rib.castShadow = !LOWFX;
+      g.add(rib);
+    });
+  }
+  // череп
+  var sk = new THREE.Mesh(new THREE.SphereGeometry(2.7, 14, 10), bone);
+  sk.scale.set(0.9, 1.0, 1.35);
+  sk.position.set(0, 3.0, 14);
+  sk.castShadow = !LOWFX;
+  g.add(sk);
+  var jaw = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.35, 6, 14), bone);
+  jaw.position.set(0, 1.6, 16.4); jaw.rotation.x = 1.3;
+  g.add(jaw);
+  [-1, 1].forEach(function(sd){
+    var eye = new THREE.Mesh(new THREE.SphereGeometry(0.75, 8, 6), M.dark);
+    eye.position.set(sd * 1.5, 3.7, 15.4);
+    g.add(eye);
+  });
+  // хвостові кістки
+  for (var t2 = 0; t2 < 4; t2++) {
+    var tb = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 1.6), bone);
+    tb.position.set(0, 3.2 - t2 * 0.3, -12 - t2 * 1.6);
+    tb.rotation.x = t2 * 0.1;
+    g.add(tb);
+  }
+  addWall(bx, bz, 2.4, by + 4);
+  addWall(bx + 8, bz + 6, 2.0, by + 4);
+  scatterRocks(bx, bz, 14, 10, 0.3, 0.9);
+})();
+
+/* --- дольмен: коло каменів із руною --- */
+(function(){
+  var cx = -44, cz = 8;
+  for (var i = 0; i < 8; i++) {
+    var a = i / 8 * 6.283;
+    var x = cx + Math.cos(a) * 6.4, z = cz + Math.sin(a) * 6.4;
+    var y = hAt(x, z), h = 3.4 + rnd() * 1.6;
+    var st = new THREE.Mesh(new THREE.BoxGeometry(1.3, h, 0.8), M.stoneL);
+    st.position.set(x, y + h / 2, z);
+    st.rotation.set(rr(-0.06, 0.06), a + rr(-0.2, 0.2), rr(-0.07, 0.07));
+    st.castShadow = !LOWFX;
+    scene.add(st);
+    addWall(x, z, 0.75, y + h);
+    if (i % 3 === 0) {
+      var lin = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.7, 1.0), M.stone);
+      lin.position.set(cx + Math.cos(a + 0.4) * 6.4, y + h + 0.3, cz + Math.sin(a + 0.4) * 6.4);
+      lin.rotation.y = a + 1.2;
+      scene.add(lin);
     }
   }
-  // каміння
+  var oy = hAt(cx, cz);
+  var alt = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.9, 0.7, 10), M.stoneD);
+  alt.position.set(cx, oy + 0.35, cz);
+  scene.add(alt);
+  addWall(cx, cz, 1.7, oy + 0.9);
+  scatterRocks(cx, cz, 10, 8, 0.3, 0.8);
+})();
+
+/* --- зруйнована вежа --- */
+(function(){
+  var tx = -26, tz = -34, ty = hAt(tx, tz);
+  var g = new THREE.Group();
+  g.position.set(tx, ty, tz);
+  scene.add(g);
+  var body = new THREE.Mesh(new THREE.CylinderGeometry(3.1, 3.8, 15, 12), M.stoneL);
+  body.position.y = 7.5; body.castShadow = !LOWFX;
+  g.add(body);
+  // обвалений верх
+  for (var i = 0; i < 9; i++) {
+    var a = i / 9 * 6.283;
+    var h = 1.2 + rnd() * 2.4;
+    var cr = new THREE.Mesh(new THREE.BoxGeometry(1.5, h, 1.0), M.stone);
+    cr.position.set(Math.cos(a) * 3.0, 15 + h / 2, Math.sin(a) * 3.0);
+    cr.rotation.y = a;
+    g.add(cr);
+  }
+  var door = new THREE.Mesh(new THREE.BoxGeometry(2.0, 3.2, 0.6), M.dark);
+  door.position.set(0, 1.6, 3.7);
+  g.add(door);
+  addWall(tx, tz, 3.4, ty + 17);
+  scatterRocks(tx, tz, 12, 12, 0.4, 1.3);
+  for (var d = 0; d < 3; d++) deadTree(tx + rr(-11, 11), tz + rr(-11, 11), 5 + rnd() * 3);
+})();
+
+/* --- селище: чотири руїни, криниця, огорожі, табір --- */
+var CAMP = { x: 22, z: 20 };
+(function(){
+  ruinHouse(CAMP.x - 7, CAMP.z + 6, 0.3, 7, 6, 3.6, 1);
+  ruinHouse(CAMP.x + 6, CAMP.z + 8, -0.5, 6, 6, 3.4, 4);
+  ruinHouse(CAMP.x + 9, CAMP.z - 6, 1.2, 8, 6, 3.8, 2);
+  ruinHouse(CAMP.x - 8, CAMP.z - 8, -1.1, 6, 5, 3.2, 5);
+  // криниця
+  var wx = CAMP.x, wz = CAMP.z + 1, wy = hAt(wx, wz);
+  var well = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.25, 1.2, 12), M.stoneL);
+  well.position.set(wx, wy + 0.6, wz); well.castShadow = !LOWFX;
+  scene.add(well);
+  var hole = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.2, 12), M.dark);
+  hole.position.set(wx, wy + 1.15, wz);
+  scene.add(hole);
+  addWall(wx, wz, 1.3, wy + 1.4);
+  [-1, 1].forEach(function(sd){
+    var post = new THREE.Mesh(new THREE.BoxGeometry(0.22, 2.4, 0.22), M.wood);
+    post.position.set(wx + sd * 1.0, wy + 1.9, wz);
+    scene.add(post);
+  });
+  var beam = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.22, 0.22), M.wood);
+  beam.position.set(wx, wy + 3.0, wz);
+  scene.add(beam);
+  // багаття табору (не вогнище для відпочинку)
+  var fx2 = CAMP.x - 2, fz2 = CAMP.z - 3, fy2 = hAt(fx2, fz2);
+  for (var s2 = 0; s2 < 7; s2++) {
+    var a2 = s2 / 7 * 6.283;
+    var st2 = new THREE.Mesh(new THREE.DodecahedronGeometry(0.22, 0), M.stone);
+    st2.position.set(fx2 + Math.cos(a2) * 0.9, fy2 + 0.1, fz2 + Math.sin(a2) * 0.9);
+    scene.add(st2);
+  }
+  var cf = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.7, 6), M.ember);
+  cf.position.set(fx2, fy2 + 0.35, fz2);
+  scene.add(cf);
+  var cl = new THREE.PointLight(0xff8a3a, 1.1, 13);
+  cl.position.set(fx2, fy2 + 1.0, fz2);
+  scene.add(cl);
+  flames.push({ mesh: cf, light: cl, p: rnd() * 6 });
+  // огорожі
+  for (var fnc = 0; fnc < 12; fnc++) {
+    var fa = fnc / 12 * 6.283;
+    var px2 = CAMP.x + Math.cos(fa) * 15, pz2 = CAMP.z + Math.sin(fa) * 15;
+    if (roadDist(px2, pz2) < 4) continue;
+    var py2 = hAt(px2, pz2);
+    var pst = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.5, 0.16), M.wood);
+    pst.position.set(px2, py2 + 0.75, pz2);
+    pst.rotation.z = rr(-0.15, 0.15);
+    scene.add(pst);
+    var rail = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 3.2), M.wood);
+    rail.position.set(px2, py2 + 1.0, pz2);
+    rail.rotation.y = fa + Math.PI / 2;
+    scene.add(rail);
+  }
+  scatterRocks(CAMP.x, CAMP.z, 18, 10, 0.3, 0.9);
+})();
+
+/* --- міст через сухе русло --- */
+(function(){
+  var bx = 4, bz = RIVER_Z, by = hAt(bx, bz + 9) + 0.2;
+  var deck = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.7, 18), M.stoneL);
+  deck.position.set(bx, by, bz);
+  deck.receiveShadow = !LOWFX; deck.castShadow = !LOWFX;
+  scene.add(deck);
+  [-1, 1].forEach(function(sd){
+    var par = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.0, 18), M.stone);
+    par.position.set(bx + sd * 3.35, by + 0.85, bz);
+    par.castShadow = !LOWFX;
+    scene.add(par);
+    addBox(bx + sd * 3.35, bz, 0.25, 9, 0, by + 1.4);
+  });
+  // опори
+  [-5, 5].forEach(function(o){
+    var pil = new THREE.Mesh(new THREE.BoxGeometry(1.4, 8, 1.4), M.stoneD);
+    pil.position.set(bx, by - 4, bz + o);
+    scene.add(pil);
+  });
+  BRIDGE = { x: bx, z: bz, y: by };
+})();
+
+/* --- дороговкази вздовж шляху --- */
+(function(){
+  for (var i = 0; i < 9; i++) {
+    var t = i / 8;
+    var seg = t * (ROAD.length - 1), si = Math.min(ROAD.length - 2, Math.floor(seg)), sf = seg - si;
+    var rx = ROAD[si][0] + (ROAD[si + 1][0] - ROAD[si][0]) * sf;
+    var rz = ROAD[si][1] + (ROAD[si + 1][1] - ROAD[si][1]) * sf;
+    var side = i % 2 ? 1 : -1;
+    var ox = rx + side * 4.6, oz = rz + rr(-1.5, 1.5);
+    if (Math.abs(oz - RIVER_Z) < 11) continue;
+    var oy = hAt(ox, oz);
+    var post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 2.6, 6), M.wood);
+    post.position.set(ox, oy + 1.3, oz);
+    post.castShadow = !LOWFX;
+    scene.add(post);
+    var lamp = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.4), M.rust);
+    lamp.position.set(ox, oy + 2.7, oz);
+    scene.add(lamp);
+    var fm = new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 5), M.ember);
+    fm.position.set(ox, oy + 2.7, oz);
+    scene.add(fm);
+    var L = new THREE.PointLight(0xffa24a, 0.75, 11);
+    L.position.set(ox, oy + 2.8, oz);
+    scene.add(L);
+    flames.push({ mesh: fm, light: L, p: rnd() * 6 });
+  }
+})();
+
+/* --- загальна рослинність --- */
+(function(){
+  var KEEP = [[CHAPEL.x, CHAPEL.z, 13], [CAMP.x, CAMP.z, 13], [ARENA.x, ARENA.z, ARENA.r + 4], [-44, 8, 8]];
+  function clear(x, z){
+    for (var i = 0; i < KEEP.length; i++)
+      if (Math.hypot(x - KEEP[i][0], z - KEEP[i][1]) < KEEP[i][2]) return false;
+    for (var f = 0; f < FIRES.length; f++)
+      if (Math.hypot(x - FIRES[f].x, z - FIRES[f].z) < 6) return false;
+    if (Math.abs(z - RIVER_Z) < 8 && Math.abs(x - 4) < 6) return false;
+    return true;
+  }
+  for (var i = 0; i < 26; i++) {
+    var a = rnd() * 6.283, r = 18 + rnd() * 84;
+    var x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (roadDist(x, z) < 4.5 || !clear(x, z)) continue;
+    deadTree(x, z, 4.5 + rnd() * 5);
+  }
   var rockG = new THREE.DodecahedronGeometry(1, 0);
-  var rocks = new THREE.InstancedMesh(rockG, M.stone, 90);
+  var rocks = new THREE.InstancedMesh(rockG, M.stone, 150);
   var zeroM = new THREE.Matrix4().makeScale(0, 0, 0);
-  for (var z0 = 0; z0 < 90; z0++) rocks.setMatrixAt(z0, zeroM);
+  for (var z0 = 0; z0 < 150; z0++) rocks.setMatrixAt(z0, zeroM);
   rocks.castShadow = !LOWFX; rocks.receiveShadow = !LOWFX;
-  var m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sv = new THREE.Vector3(), pv = new THREE.Vector3();
-  for (var k = 0; k < 90; k++) {
-    var aa = rnd() * Math.PI * 2, rr2 = 8 + rnd() * 74;
+  var m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(),
+      sv = new THREE.Vector3(), pv = new THREE.Vector3();
+  for (var k = 0; k < 150; k++) {
+    var aa = rnd() * 6.283, rr2 = 10 + rnd() * 96;
     var px = Math.cos(aa) * rr2, pz = Math.sin(aa) * rr2;
-    if (Math.hypot(px - CHAPEL.x, pz - CHAPEL.z) < 12) continue;
-    if (Math.hypot(px - ARENA.x, pz - ARENA.z) < ARENA.r + 3) continue;
-    var nearFire = false;
-    for (var nf = 0; nf < FIRES.length; nf++)
-      if (Math.hypot(px - FIRES[nf].x, pz - FIRES[nf].z) < 4) nearFire = true;
-    if (nearFire) continue;
-    var s2 = 0.3 + rnd() * 1.5;
+    if (!clear(px, pz)) continue;
+    var s2 = 0.3 + rnd() * 1.6;
     pv.set(px, hAt(px, pz) + s2 * 0.35, pz);
     e.set(rnd() * 3, rnd() * 3, rnd() * 3); q.setFromEuler(e);
     sv.set(s2, s2 * rr(0.5, 0.9), s2 * rr(0.7, 1.2));
     m4.compose(pv, q, sv);
     rocks.setMatrixAt(k, m4);
-    if (s2 > 1.0) addWall(px, pz, s2 * 0.8, hAt(px, pz) + s2 * 1.15);
+    if (s2 > 1.0) addWall(px, pz, s2 * 0.75, hAt(px, pz) + s2 * 1.15);
   }
   rocks.instanceMatrix.needsUpdate = true;
   scene.add(rocks);
 
-  // трава
+  // трава купами, а не рівним килимом
   var bladeG = new THREE.ConeGeometry(0.16, 0.8, 3);
-  var grass = new THREE.InstancedMesh(bladeG, M.foeB, 420);
-  for (var z1 = 0; z1 < 420; z1++) grass.setMatrixAt(z1, new THREE.Matrix4().makeScale(0, 0, 0));
-  for (var t = 0; t < 420; t++) {
-    var ga = rnd() * Math.PI * 2, gr = 6 + rnd() * 76;
-    var gx = Math.cos(ga) * gr, gz = Math.sin(ga) * gr;
-    if (Math.hypot(gx - CHAPEL.x, gz - CHAPEL.z) < 11) continue;
-    if (Math.hypot(gx - ARENA.x, gz - ARENA.z) < ARENA.r + 2) continue;
-    var gs = 0.5 + rnd() * 1.1;
-    pv.set(gx, hAt(gx, gz) + 0.3 * gs, gz);
-    e.set(rr(-0.2, 0.2), rnd() * 3, rr(-0.2, 0.2)); q.setFromEuler(e);
-    sv.set(gs, gs * rr(0.8, 1.8), gs);
-    m4.compose(pv, q, sv);
-    grass.setMatrixAt(t, m4);
+  var grass = new THREE.InstancedMesh(bladeG, M.foeB, 900);
+  for (var z1 = 0; z1 < 900; z1++) grass.setMatrixAt(z1, zeroM);
+  var gi = 0;
+  for (var cl = 0; cl < 70 && gi < 900; cl++) {
+    var ca = rnd() * 6.283, cr = 12 + rnd() * 92;
+    var cx2 = Math.cos(ca) * cr, cz2 = Math.sin(ca) * cr;
+    if (!clear(cx2, cz2)) continue;
+    var cnt = 6 + ((rnd() * 8) | 0);
+    for (var t = 0; t < cnt && gi < 900; t++) {
+      var gx = cx2 + rr(-2.6, 2.6), gz = cz2 + rr(-2.6, 2.6);
+      var gs = 0.5 + rnd() * 1.2;
+      pv.set(gx, hAt(gx, gz) + 0.3 * gs, gz);
+      e.set(rr(-0.2, 0.2), rnd() * 3, rr(-0.2, 0.2)); q.setFromEuler(e);
+      sv.set(gs, gs * rr(0.8, 1.9), gs);
+      m4.compose(pv, q, sv);
+      grass.setMatrixAt(gi++, m4);
+    }
   }
   grass.instanceMatrix.needsUpdate = true;
   scene.add(grass);
 
-  // надгробки вздовж дороги
-  for (var s3 = 0; s3 < 18; s3++) {
-    var t2 = s3 / 17;
-    var seg = t2 * (ROAD.length - 1), si = Math.min(ROAD.length - 2, Math.floor(seg)), sf = seg - si;
-    var rx = ROAD[si][0] + (ROAD[si + 1][0] - ROAD[si][0]) * sf;
-    var rz = ROAD[si][1] + (ROAD[si + 1][1] - ROAD[si][1]) * sf;
-    var side = s3 % 2 ? 1 : -1;
-    var ox = rx + side * (5.5 + rnd() * 3), oz = rz + rr(-2, 2);
+  // надгробки біля каплиці
+  for (var s3 = 0; s3 < 14; s3++) {
+    var ga = rnd() * 6.283, gr = 13 + rnd() * 10;
+    var ox = CHAPEL.x + Math.cos(ga) * gr, oz = CHAPEL.z + Math.sin(ga) * gr;
     var oy = hAt(ox, oz);
-    var st = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.5 + rnd(), 0.22), M.stoneL);
+    var st = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.4 + rnd(), 0.22), M.stoneL);
     st.position.set(ox, oy + 0.75, oz);
-    st.rotation.set(rr(-0.12, 0.12), rnd() * 3, rr(-0.14, 0.14));
+    st.rotation.set(rr(-0.13, 0.13), rnd() * 3, rr(-0.15, 0.15));
     st.castShadow = !LOWFX;
     scene.add(st);
   }
-
-  // руїни арок обабіч дороги
-  [[-9, 4], [11, -12], [-12, -26], [8, 2]].forEach(function(p){
-    var ax = p[0], az = p[1], ay = hAt(ax, az);
+  // руїни арок уздовж дороги
+  [[-12, 52], [14, 34], [-16, -14], [10, -34]].forEach(function(pp){
+    var ax = pp[0], az = pp[1], ay = hAt(ax, az);
     var g2 = new THREE.Group();
     g2.position.set(ax, ay, az);
     g2.rotation.y = rnd() * 3;
     [-1, 1].forEach(function(s4){
-      var col = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.62, 5.5, 8), M.stoneL);
-      col.position.set(s4 * 2.2, 2.75, 0); col.castShadow = !LOWFX;
+      var col = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.64, 5.6, 8), M.stoneL);
+      col.position.set(s4 * 2.3, 2.8, 0); col.castShadow = !LOWFX;
       g2.add(col);
     });
-    var top = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.7, 1.1), M.stone);
-    top.position.y = 5.8; top.castShadow = !LOWFX;
+    var top = new THREE.Mesh(new THREE.BoxGeometry(5.8, 0.7, 1.1), M.stone);
+    top.position.y = 5.9; top.castShadow = !LOWFX;
     g2.add(top);
     scene.add(g2);
-    addWall(ax - 2.2, az, 0.6); addWall(ax + 2.2, az, 0.6);
+    addWall(ax - 2.3, az, 0.62, ay + 5.6);
+    addWall(ax + 2.3, az, 0.62, ay + 5.6);
   });
 })();
 
@@ -1042,7 +1327,7 @@ var runes = [];
     ['Золотий карась бачить усе', 'І нічим не допомагає.'],
     ['Вогнище піднімає полеглих', 'І тебе теж. Це чесно.']
   ];
-  var SPOT = [[-9, 30], [7, 4], [-13, -20], [6, -38], [18, -54], [-4, 14]];
+  var SPOT = [[-8, 64], [-34, 30], [-44, 8], [10, 8], [3, -18], [18, -44]];
   SPOT.forEach(function(sp, i){
     var x = sp[0], z = sp[1], y = hAt(x, z);
     var g = new THREE.Group();
@@ -1293,7 +1578,7 @@ var P = {
   atk: 0, atkStage: 0, combo: 0, hitDone: false,
   roll: 0, rollDir: new THREE.Vector2(0, 1), inv: 0,
   block: false, stagger: 0, dead: 0, grounded: true,
-  anim: 0, lean: 0, swordDrive: 0, respawnAt: { x: FIRE.x, z: FIRE.z + 2.2 }
+  anim: 0, lean: 0, swordDrive: 0, spaceHold: 0, heavy: false, respawnAt: { x: FIRE.x, z: FIRE.z + 2.2 }
 };
 function statHp(){ return 78 + P.vit * 22; }
 function statSt(){ return 82 + P.end * 18; }
@@ -1310,20 +1595,20 @@ var G = {
 /* ================= вороги ================= */
 var foes = [];
 var FOE = {
-  grunt: { hp: 58, dmg: 13, sp: 2.1, agr: 15, rng: 1.9, wind: 0.62, act: 0.18, rec: 0.66, roe: 34, s: 0.95,
-           poise: 26, leash: 26, r: 0.55, name: 'Полеглий короп' },
-  brute: { hp: 132, dmg: 26, sp: 1.5, agr: 13, rng: 2.4, wind: 0.95, act: 0.24, rec: 1.0, roe: 90, s: 1.35,
-           poise: 70, leash: 22, r: 0.85, name: 'Пузир' },
-  caster:{ hp: 46, dmg: 15, sp: 1.6, agr: 19, rng: 14, wind: 1.05, act: 0.15, rec: 1.2, roe: 58, s: 0.95,
-           poise: 16, leash: 24, r: 0.5, ranged: true, name: 'Муляр' }
+  grunt: { hp: 58, dmg: 13, sp: 2.1, agr: 11, rng: 1.9, wind: 0.62, act: 0.18, rec: 0.66, roe: 40, s: 0.95,
+           poise: 26, leash: 19, r: 0.55, name: 'Полеглий короп' },
+  brute: { hp: 132, dmg: 26, sp: 1.5, agr: 10, rng: 2.4, wind: 0.95, act: 0.24, rec: 1.0, roe: 110, s: 1.35,
+           poise: 70, leash: 15, r: 0.85, name: 'Пузир' },
+  caster:{ hp: 46, dmg: 15, sp: 1.6, agr: 15, rng: 13, wind: 1.05, act: 0.15, rec: 1.2, roe: 70, s: 0.95,
+           poise: 16, leash: 17, r: 0.5, ranged: true, name: 'Муляр' }
 };
+// дев'ятеро замість тринадцяти, трьома осередками, а не рівним шаром
 var SPAWNS = [
-  ['grunt', 5, 26], ['grunt', -7, 14],
-  ['grunt', 9, 2], ['caster', -13, -2], ['grunt', -10, -8],
-  ['brute', 1, -18],
-  ['grunt', -4, -28], ['grunt', 5, -32], ['caster', 15, -26],
-  ['grunt', 13, -40], ['grunt', 19, -46], ['brute', 22, -52],
-  ['caster', 28, -44]
+  ['grunt', 4, 52], ['grunt', -4, 38],          // дорога від каплиці
+  ['grunt', 20, 25], ['grunt', 27, 17], ['brute', 17, 13],   // селище
+  ['caster', -41, 4],                            // дольмен
+  ['brute', 5, -16], ['grunt', 14, -32],         // міст і далі
+  ['caster', -23, -30]                           // вежа
 ];
 
 function makeFoe(kind, x, z){
@@ -1662,14 +1947,13 @@ function fade(on, cb){
 }
 
 /* ================= бій гравця ================= */
-function attack(){
+function attack(heavy){
   if (G.mode !== 'play' || P.dead || P.roll > 0 || P.stagger > 0) return;
-  // буфер вводу: клік у будь-який момент замаху ставить наступний удар у чергу
-  if (P.atk > 0) { P.combo = 1; return; }
-  if (P.st < 20) return;
-  startSwing();
+  if (P.atk > 0) { P.combo = heavy ? 2 : 1; return; }
+  if (P.st < (heavy ? 34 : 20)) return;
+  startSwing(heavy);
 }
-function startSwing(){
+function startSwing(heavy){
   // довертаємо героя на ціль або на напрямок камери: інакше удар іде повз
   if (G.lock) P.yaw = Math.atan2(G.lock.x - P.x, G.lock.z - P.z);
   else {
@@ -1683,19 +1967,22 @@ function startSwing(){
     P.yaw = near ? Math.atan2(near.x - P.x, near.z - P.z) : camYaw + Math.PI;
   }
   P.atk = 0.001;
-  P.atkStage = (P.atkStage + 1) % 3;
+  P.heavy = !!heavy;
+  P.atkStage = heavy ? 3 : (P.atkStage + 1) % 3;
   P.hitDone = false;
-  P.st -= 20;
-  P.stLock = 0.6;
+  P.st -= heavy ? 34 : 20;
+  P.stLock = heavy ? 0.85 : 0.6;
   sSwing();
 }
 function swingWindows(){
   // [вікно замаху, вікно удару, повна тривалість]
+  if (P.atkStage === 3) return [0.42, 0.24, 1.0];   // важкий
   return P.atkStage === 2 ? [0.26, 0.20, 0.72] : [0.17, 0.15, 0.52];
 }
 function doHitCheck(){
-  var reach = P.atkStage === 2 ? 3.1 : 2.6;
-  var dmg = statDmg() * (P.atkStage === 2 ? 1.55 : 1);
+  var reach = P.atkStage === 3 ? 3.6 : (P.atkStage === 2 ? 3.1 : 2.6);
+  var dmg = statDmg() * (P.atkStage === 3 ? 2.3 : (P.atkStage === 2 ? 1.55 : 1));
+  if (P.atkStage === 3) shockwave(P.x + Math.sin(P.yaw) * 2.2, P.z + Math.cos(P.yaw) * 2.2);
   var hit = false;
   for (var i = 0; i < foes.length; i++) {
     var f = foes[i];
@@ -1789,6 +2076,11 @@ function hurtFlash(){
   }
   hurtEl.style.opacity = '1';
   setTimeout(function(){ hurtEl.style.opacity = '0'; }, 90);
+}
+function jump(){
+  if (G.mode !== 'play' || P.dead || !P.grounded || P.roll > 0 || P.st < 14) return;
+  P.vy = 7.6; P.st -= 14; P.stLock = 0.4;
+  if (ok()) nz(AC.currentTime, 0.18, 500, 0.8, 0.08, null, 200);
 }
 function quaff(){
   if (G.mode !== 'play' || P.dead || P.flasks <= 0 || P.hp >= P.hpMax || P.atk > 0) return;
@@ -1997,7 +2289,9 @@ function updateFx(dt){
 
 /* ================= рух гравця ================= */
 var camYaw = 0, camPitch = 0.10, camDist = 6.2, camNow = new THREE.Vector3();
-var camYawS = 0, camPitchS = 0.10, camDistNow = 6.2, camSens = 0.0021;
+var camYawS = 0, camPitchS = 0.10, camDistNow = 6.2, camSens = 0.0012;
+var camSide = 0;                 // зміщення через плече, щоб герой не затуляв ціль
+var lockBlend = 0;
 function exitLock(){ if (document.exitPointerLock) document.exitPointerLock(); }
 
 function updatePlayer(dt){
@@ -2007,7 +2301,7 @@ function updatePlayer(dt){
 
   // камера від миші
   camYaw -= mouse.dx * camSens;
-  camPitch += mouse.dy * camSens * 0.85;
+  camPitch += mouse.dy * camSens * 0.8;
   camPitch = Math.max(-0.42, Math.min(0.86, camPitch));
   mouse.dx = 0; mouse.dy = 0;
 
@@ -2030,20 +2324,18 @@ function updatePlayer(dt){
   var wz = -Math.cos(cy) * iz - Math.sin(cy) * ix;
 
   P.block = mouse.rmb && P.atk <= 0 && P.roll <= 0 && P.stagger <= 0 && P.st > 4;
-  var sprint = !!keys.ShiftLeft && il > 0.1 && P.st > 6 && !P.block;
-
-  // перекат і стрибок
-  if (pressed.Space === 1 && P.roll <= 0 && P.atk <= 0 && P.stagger <= 0 && P.st >= 24) {
-    pressed.Space = 2;
-    if (sprint && P.grounded) { P.vy = 7.4; P.st -= 14; }
-    else {
-      P.roll = 0.001; P.inv = 0.36; P.st -= 24; P.stLock = 0.55;
+  // пробіл: коротке натискання — перекат, утримання — біг
+  if (keys.Space) { P.spaceHold += dt; } else {
+    if (P.spaceHold > 0 && P.spaceHold < 0.22 && P.roll <= 0 && P.atk <= 0 && P.stagger <= 0 && P.st >= 24) {
+      P.roll = 0.001; P.inv = 0.38; P.st -= 24; P.stLock = 0.55;
       var rl = Math.hypot(wx, wz);
-      if (rl < 0.1) { P.rollDir.set(Math.sin(P.yaw), Math.cos(P.yaw)); }
+      if (rl < 0.1) P.rollDir.set(Math.sin(P.yaw), Math.cos(P.yaw));
       else P.rollDir.set(wx / rl, wz / rl);
       sRoll();
     }
+    P.spaceHold = 0;
   }
+  var sprint = P.spaceHold > 0.22 && il > 0.1 && P.st > 6 && !P.block && P.atk <= 0;
 
   var speed = 0;
   if (P.roll > 0) {
@@ -2106,8 +2398,9 @@ function updatePlayer(dt){
     P.swordDrive = P.atk < w[0] ? -1.4 * (P.atk / w[0]) : 1.6 * (1 - Math.min(1, (P.atk - w[0]) / (w[1] + 0.1)));
     if (P.atk >= w[2]) {
       P.atk = 0; P.swordDrive = 0;
-      if (P.combo && P.st >= 20) { P.combo = 0; startSwing(); }
-      else { P.combo = 0; P.atkStage = -1; }
+      var q = P.combo; P.combo = 0;
+      if (q && P.st >= (q === 2 ? 34 : 20)) startSwing(q === 2);
+      else P.atkStage = -1;
     }
   } else {
     P.swordDrive += (0 - P.swordDrive) * Math.min(1, dt * 6);
@@ -2187,11 +2480,13 @@ function updateCamera(dt){
   if (G.lock) {
     var dx = G.lock.x - P.x, dz = G.lock.z - P.z;
     camYaw = Math.atan2(dx, dz) + Math.PI;
-    camPitch += (0.12 - camPitch) * Math.min(1, dt * 3);
-  }
-  // кути доганяють ціль плавно — сира миша давала ривки
-  camYawS += angWrap(camYaw - camYawS) * Math.min(1, dt * 13);
-  camPitchS += (camPitch - camPitchS) * Math.min(1, dt * 13);
+    camPitch += (0.13 - camPitch) * Math.min(1, dt * 2.2);
+    lockBlend = Math.min(1, lockBlend + dt * 2.2);
+  } else lockBlend = Math.max(0, lockBlend - dt * 4);
+  // кути доганяють ціль м'яко: сира миша давала ривки, а захоплення — різкий розворот
+  var turn = G.lock ? 3.2 + lockBlend * 4 : 9;
+  camYawS += angWrap(camYaw - camYawS) * Math.min(1, dt * turn);
+  camPitchS += (camPitch - camPitchS) * Math.min(1, dt * 9);
   var camYaw0 = camYaw, camPitch0 = camPitch;
   camYaw = camYawS; camPitch = camPitchS;
   var camDist = (G.lock && G.lock === boss) ? 9.2 : 6.2;
@@ -2208,16 +2503,25 @@ function updateCamera(dt){
   // наближення різке, віддалення повільне — інакше камера смикається біля кожного каменя
   camDistNow += (dist - camDistNow) * Math.min(1, dt * (dist < camDistNow ? 18 : 3.5));
   dist = camDistNow;
+  // камера трохи праворуч від осі: інакше герой затуляє того, з ким б'єшся
+  camSide += ((G.lock ? 1.05 : 0.72) - camSide) * Math.min(1, dt * 5);
+  var rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
   var want = new THREE.Vector3(
-    tx + Math.sin(camYaw) * Math.cos(camPitch) * dist,
+    tx + Math.sin(camYaw) * Math.cos(camPitch) * dist + rx * camSide,
     ty + Math.sin(camPitch) * dist + 0.4 * (dist / camDist),
-    tz + Math.cos(camYaw) * Math.cos(camPitch) * dist
+    tz + Math.cos(camYaw) * Math.cos(camPitch) * dist + rz * camSide
   );
   var gh = hAt(want.x, want.z) + 0.7;
   if (want.y < gh) want.y = gh;
   camNow.lerp(want, Math.min(1, dt * 11));
   camera.position.copy(camNow);
-  camera.lookAt(tx, ty + (G.lock ? 0.75 : 0.55), tz);
+  var lx = tx + rx * camSide * 0.55, lz = tz + rz * camSide * 0.55;
+  if (G.lock) {
+    // дивимось у точку між героєм і ціллю, щоб обидва були в кадрі
+    lx = tx + (G.lock.x - tx) * 0.34 + rx * camSide * 0.3;
+    lz = tz + (G.lock.z - tz) * 0.34 + rz * camSide * 0.3;
+  }
+  camera.lookAt(lx, ty + (G.lock ? 0.8 : 0.55), lz);
   camYaw = camYaw0; camPitch = camPitch0;
   // впритул героя не видно — робимо його напівпрозорим
   var fadeK = dist < 3.0 ? Math.max(0.55, (dist - 2.1) / 0.9) : 1;
@@ -2231,19 +2535,29 @@ function updateCamera(dt){
 }
 function toggleLock(){
   if (G.lock) { G.lock = null; UI.lock.classList.remove('on'); return; }
-  var best = null, bd = 24;
-  for (var i = 0; i < foes.length; i++) {
-    var f = foes[i];
-    if (!f.alive) continue;
-    var d = Math.hypot(f.x - P.x, f.z - P.z);
-    if (d < bd) { bd = d; best = f; }
+  // тільки те, що попереду: раніше камера різко розверталась на ворога за спиною
+  var fwd = camYaw + Math.PI;
+  var best = null, bestScore = 1e9;
+  function consider(o, maxD){
+    var dx = o.x - P.x, dz = o.z - P.z;
+    var d = Math.hypot(dx, dz);
+    if (d > maxD) return;
+    var off = Math.abs(angWrap(Math.atan2(dx, dz) - fwd));
+    if (off > 0.95) return;
+    var score = off * 14 + d;
+    if (score < bestScore) { bestScore = score; best = o; }
   }
-  if (boss && !boss.dead && G.bossOn) {
-    var d2 = Math.hypot(boss.x - P.x, boss.z - P.z);
-    if (d2 < bd + 6) best = boss;
+  for (var i = 0; i < foes.length; i++) if (foes[i].alive) consider(foes[i], 26);
+  if (boss && !boss.dead && G.bossOn) consider(boss, 34);
+  if (!best) {
+    // нема на кого — камеру не чіпаємо, лише тихий відмовний клац
+    if (ok()) nz(AC.currentTime, 0.06, 1400, 2.5, 0.05);
+    return;
   }
   G.lock = best;
-  UI.lock.classList.toggle('on', !!best);
+  lockBlend = 0;
+  UI.lock.classList.add('on');
+  if (ok()) { var t = AC.currentTime; tone(t, 660, 0.08, 'triangle', 0.07); tone(t + 0.05, 880, 0.09, 'sine', 0.05); }
 }
 
 /* ================= взаємодія ================= */
@@ -2328,6 +2642,8 @@ function restAtFire(){
   P.hp = P.hpMax; P.st = P.stMax; P.flasks = P.flasksMax;
   var F = G.fire || FIRES[0];
   P.respawnAt = { x: F.x, z: F.z + 2.4 };
+  G.lock = null;
+  UI.lock.classList.remove('on');
   for (var i = 0; i < fireObjs.length; i++) if (fireObjs[i].F === F) fireObjs[i].lit = true;
   spawnAll();
   if (boss && !G.bossDead) {
@@ -2377,8 +2693,9 @@ function onPress(c, e){
   if (c === 'Escape' || c === 'KeyP') { if (G.mode === 'play' || G.mode === 'pause') pause(G.mode === 'play'); return; }
   if (G.mode !== 'play') return;
   if (c === 'KeyE') interact();
-  else if (c === 'KeyR') quaff();
-  else if (c === 'KeyQ' || c === 'Tab') toggleLock();
+  else if (c === 'KeyF') jump();
+  else if (c === 'KeyQ') quaff();
+  else if (c === 'Tab') toggleLock();
 }
 function pause(on){
   if (on) { G.mode = 'pause'; exitLock(); if (AB.mus) AB.mus.gain.value = 0; }
@@ -2544,7 +2861,7 @@ function animateWorld(dt){
   }
   // карась дихає
   if (bigKaras) {
-    bigKaras.position.y = 54 + Math.sin(G.t * 0.22) * 2.4;
+    bigKaras.position.y = 88 + Math.sin(G.t * 0.22) * 2.6;
     bigKaras.rotation.y = 0.34 + Math.sin(G.t * 0.11) * 0.07;
     bigKaras.rotation.z = -Math.PI / 2 + 0.1 + Math.sin(G.t * 0.17) * 0.04;
   }
