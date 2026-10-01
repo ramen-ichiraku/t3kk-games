@@ -1,8 +1,6 @@
 /* ================= головний цикл ================= */
 P.hpMax = statHp(); P.stMax = statSt(); P.hp = P.hpMax; P.st = P.stMax;
-P.y = hAt(P.x, P.z);
-camNow.set(P.x, P.y + 4, P.z + 6);
-spawnAll();
+loadZone('field');
 makeBoss();
 syncUI();
 

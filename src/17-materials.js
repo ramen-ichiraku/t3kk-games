@@ -19,5 +19,5 @@ var M = {
   ember:  mat(0xff7a2a, { emissive: 0xc23c05 })
 };
 
-var flames = [], doorLeaves = [], doorCollider = null;
-
+SHARED_MATS = new Set();
+for (var mk in M) if (M.hasOwnProperty(mk)) SHARED_MATS.add(M[mk]);

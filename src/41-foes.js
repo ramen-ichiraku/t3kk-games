@@ -23,7 +23,7 @@ function makeFoe(kind, x, z){
     ? { s: d.s, body: M.cloth, belly: M.foeB, fin: M.foeA, skin: M.foeSkin, hairs: 1 }
     : { s: d.s, body: M.foeA, belly: M.foeB, fin: M.rust, skin: M.foeSkin, hairs: kind === 'brute' ? 0 : 2 };
   var g = buildFish(cfg);
-  scene.add(g);
+  (zoneRoot || scene).add(g);
   var pr = g.userData.P;
   var wep = null;
   if (kind === 'caster') {
@@ -63,22 +63,14 @@ function makeFoe(kind, x, z){
   return f;
 }
 function spawnAll(){
-  for (var i = 0; i < foes.length; i++) scene.remove(foes[i].g);
+  for (var i = 0; i < foes.length; i++) { scene.remove(foes[i].g); disposeTree(foes[i].g); }
   foes.length = 0;
-  for (var k = 0; k < SPAWNS.length; k++) makeFoe(SPAWNS[k][0], SPAWNS[k][1], SPAWNS[k][2]);
+  var list = (ZONE && ZONE.foes) || SPAWNS;
+  for (var k = 0; k < list.length; k++) makeFoe(list[k][0], list[k][1], list[k][2]);
 }
 
 // ворогів не пускаємо в ущелину й залу боса — вони туди забредали й заважали
-function keepOut(f){
-  var ad = Math.hypot(f.x - ARENA.x, f.z - ARENA.z);
-  var lim = ARENA.r + 8;
-  if (ad < lim) {
-    var a = Math.atan2(f.x - ARENA.x, f.z - ARENA.z);
-    f.x = ARENA.x + Math.sin(a) * lim;
-    f.z = ARENA.z + Math.cos(a) * lim;
-  }
-  if (f.z < GORGE.z0 && Math.abs(f.x - GX) < 9) f.z = GORGE.z0;
-}
+function keepOut(f){ if (ZONE && ZONE.keepOut) ZONE.keepOut(f); }
 function moveFoe(f, vx, vz, dt){
   var nx = f.x + vx * dt, nz = f.z + vz * dt;
   var r = resolve(nx, nz, f.d.r);
