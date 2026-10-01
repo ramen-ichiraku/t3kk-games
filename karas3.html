@@ -1548,7 +1548,7 @@ function wobbleSword(sw, t, drive){
   var segs = sw.userData.segs;
   for (var i = 0; i < segs.length; i++) {
     var k = (i + 1) / segs.length;
-    segs[i].rotation.x = 0.1 * k + Math.sin(t * 7 - i * 0.7) * 0.075 * k + drive * 0.3 * k;
+    segs[i].rotation.x = 0.1 * k + Math.sin(t * 7 - i * 0.7) * 0.075 * k + drive * 0.26 * k;
     segs[i].rotation.z = Math.cos(t * 5.3 - i * 0.55) * 0.06 * k;
   }
 }
@@ -2395,7 +2395,6 @@ function updatePlayer(dt){
     P.atk += dt;
     var w = swingWindows();
     if (!P.hitDone && P.atk >= w[0]) { P.hitDone = true; doHitCheck(); }
-    P.swordDrive = P.atk < w[0] ? -1.4 * (P.atk / w[0]) : 1.6 * (1 - Math.min(1, (P.atk - w[0]) / (w[1] + 0.1)));
     if (P.atk >= w[2]) {
       P.atk = 0; P.swordDrive = 0;
       var q = P.combo; P.combo = 0;
@@ -2415,6 +2414,39 @@ function updatePlayer(dt){
   posePlayer(dt, speed, il);
 }
 
+/* Кожен удар описаний трьома позами: спокій, замах, проводка.
+   Раніше рухалось лише плече, тож удар виглядав як помах рукою. */
+function sm(t){ t = t < 0 ? 0 : (t > 1 ? 1 : t); return t * t * (3 - 2 * t); }
+function fo(t){ t = t < 0 ? 0 : (t > 1 ? 1 : t); return 1 - Math.pow(1 - t, 3); }
+var REST_POSE = { shx:0.15, shz:0.12, elx:-0.55, torY:0, torX:0, hipY:0, step:0, lshx:0, headY:0, drive:0 };
+var ATK_POSE = [
+  { // 0 — діагональ згори-справа
+    wind: { shx:-1.95, shz:-0.70, elx:-1.05, torY: 0.62, torX:-0.14, hipY: 0.32, step:-0.14, lshx: 0.55, headY: 0.30, drive:-1.5 },
+    hit:  { shx: 0.95, shz: 0.78, elx:-0.14, torY:-0.58, torX: 0.22, hipY:-0.26, step: 0.32, lshx:-0.45, headY:-0.26, drive: 1.7 }
+  },
+  { // 1 — горизонталь зліва направо
+    wind: { shx:-0.55, shz:-1.80, elx:-1.15, torY:-0.78, torX: 0.02, hipY:-0.36, step:-0.12, lshx:-0.55, headY:-0.36, drive:-1.3 },
+    hit:  { shx:-0.12, shz: 1.55, elx:-0.18, torY: 0.74, torX: 0.12, hipY: 0.32, step: 0.30, lshx: 0.55, headY: 0.32, drive: 1.6 }
+  },
+  { // 2 — завершальний, з розмаху згори
+    wind: { shx:-2.75, shz: 0.02, elx:-0.95, torY: 0.36, torX:-0.32, hipY: 0.16, step:-0.18, lshx: 0.35, headY: 0.16, drive:-1.8 },
+    hit:  { shx: 1.20, shz: 0.10, elx:-0.08, torY:-0.28, torX: 0.42, hipY:-0.12, step: 0.46, lshx:-0.35, headY:-0.42, drive: 2.1 }
+  },
+  { // 3 — важкий, двома руками
+    wind: { shx:-2.95, shz:-0.16, elx:-0.72, torY: 0.20, torX:-0.46, hipY: 0.10, step:-0.24, lshx:-2.60, headY: 0.12, drive:-2.2 },
+    hit:  { shx: 1.40, shz: 0.06, elx: 0.02, torY:-0.16, torX: 0.58, hipY:-0.06, step: 0.58, lshx: 1.15, headY:-0.52, drive: 2.6 }
+  }
+];
+var POSE_KEYS = ['shx','shz','elx','torY','torX','hipY','step','lshx','headY','drive'];
+var poseTmp = {};
+function mixPose(A, B, t){
+  for (var i = 0; i < POSE_KEYS.length; i++) {
+    var k = POSE_KEYS[i];
+    poseTmp[k] = A[k] + (B[k] - A[k]) * t;
+  }
+  return poseTmp;
+}
+
 function posePlayer(dt, speed, il){
   player.position.set(P.x, P.y, P.z);
   player.rotation.y = P.yaw;
@@ -2432,43 +2464,66 @@ function posePlayer(dt, speed, il){
   }
 
   var sw = Math.sin(t) * moving;
-  PP.legs[0].hp.rotation.x = sw * 0.66;
-  PP.legs[1].hp.rotation.x = -sw * 0.66;
-  PP.legs[0].kn.rotation.x = Math.max(0, -sw) * 0.85;
-  PP.legs[1].kn.rotation.x = Math.max(0, sw) * 0.85;
-  PP.torso.rotation.x = 0.06 + moving * 0.12 + Math.sin(t * 2) * 0.02;
+  if (P.atk <= 0) {
+    PP.legs[0].hp.rotation.x = sw * 0.66;
+    PP.legs[1].hp.rotation.x = -sw * 0.66;
+    PP.legs[0].kn.rotation.x = Math.max(0, -sw) * 0.85;
+    PP.legs[1].kn.rotation.x = Math.max(0, sw) * 0.85;
+    PP.torso.rotation.x = 0.06 + moving * 0.12 + Math.sin(t * 2) * 0.02;
+    PP.head.rotation.y = Math.sin(t * 0.5) * 0.06;
+  }
   PP.tail.rotation.y = Math.sin(t * 0.9 + 1) * (0.2 + moving * 0.3);
-  PP.head.rotation.y = Math.sin(t * 0.5) * 0.06;
   if (PP.hairs) for (var h = 0; h < PP.hairs.length; h++) {
     PP.hairs[h].rotation.z = Math.sin(G.t * 5 + h) * 0.28 - moving * 0.3;
     PP.hairs[h].rotation.x = -moving * 0.5;
   }
-  PP.arms[0].sh.rotation.x = -sw * 0.55;
-  PP.arms[0].el.rotation.x = -0.3;
 
-  var a = PP.arms[1];
+  var a = PP.arms[1], la = PP.arms[0];
   if (P.atk > 0) {
     var w = swingWindows();
-    var k = P.atk / w[2];
-    if (P.atkStage === 1) {
-      a.sh.rotation.z = -1.6 + 2.8 * Math.min(1, k * 1.7);
-      a.sh.rotation.x = -0.6 + 0.9 * Math.min(1, k * 1.7);
-    } else if (P.atkStage === 2) {
-      a.sh.rotation.x = -2.6 + 3.6 * Math.min(1, k * 1.5);
-      a.sh.rotation.z = 0.1;
+    var tA = w[0], tB = w[0] + w[1], tot = w[2];
+    var S0 = ATK_POSE[P.atkStage < 0 ? 0 : P.atkStage] || ATK_POSE[0];
+    var pose;
+    if (P.atk < tA) {
+      // замах: повільно, з відведенням корпусу назад
+      pose = mixPose(REST_POSE, S0.wind, sm(P.atk / tA));
+    } else if (P.atk < tB) {
+      // проводка: різко, з доворотом корпусу й кроком уперед
+      pose = mixPose(S0.wind, S0.hit, fo((P.atk - tA) / (tB - tA)));
     } else {
-      a.sh.rotation.x = -2.2 + 3.1 * Math.min(1, k * 1.7);
-      a.sh.rotation.z = -0.2;
+      // повернення в стійку
+      pose = mixPose(S0.hit, REST_POSE, sm((P.atk - tB) / Math.max(0.001, tot - tB)));
     }
-    a.el.rotation.x = -0.25;
-  } else if (P.block) {
-    a.sh.rotation.x += (-1.05 - a.sh.rotation.x) * Math.min(1, dt * 12);
-    a.sh.rotation.z += (0.85 - a.sh.rotation.z) * Math.min(1, dt * 12);
-    a.el.rotation.x += (-0.9 - a.el.rotation.x) * Math.min(1, dt * 12);
+    a.sh.rotation.x = pose.shx; a.sh.rotation.z = pose.shz; a.el.rotation.x = pose.elx;
+    la.sh.rotation.x = pose.lshx; la.el.rotation.x = -0.3 - Math.abs(pose.lshx) * 0.2;
+    PP.torso.rotation.y = pose.torY;
+    PP.torso.rotation.x = 0.06 + pose.torX;
+    PP.hip.rotation.y = pose.hipY;
+    PP.hip.position.z = pose.step;
+    PP.head.rotation.y = pose.headY;
+    // ноги роблять крок, а не стоять колом
+    PP.legs[0].hp.rotation.x = -pose.step * 1.9;
+    PP.legs[1].hp.rotation.x = pose.step * 1.1;
+    PP.legs[0].kn.rotation.x = Math.max(0, pose.step) * 0.7;
+    PP.legs[1].kn.rotation.x = Math.max(0, -pose.step) * 0.9;
+    P.swordDrive = pose.drive;
   } else {
-    a.sh.rotation.x += (0.15 + sw * 0.25 - a.sh.rotation.x) * Math.min(1, dt * 8);
-    a.sh.rotation.z += (0.12 - a.sh.rotation.z) * Math.min(1, dt * 8);
-    a.el.rotation.x += (-0.55 - a.el.rotation.x) * Math.min(1, dt * 8);
+    var sp2 = Math.min(1, dt * 9);
+    PP.torso.rotation.y += (0 - PP.torso.rotation.y) * sp2;
+    PP.hip.rotation.y += (0 - PP.hip.rotation.y) * sp2;
+    PP.hip.position.z += (0 - PP.hip.position.z) * sp2;
+    la.sh.rotation.x += (-sw * 0.55 - la.sh.rotation.x) * sp2;
+    la.el.rotation.x += (-0.3 - la.el.rotation.x) * sp2;
+    if (P.block) {
+      a.sh.rotation.x += (-1.05 - a.sh.rotation.x) * Math.min(1, dt * 12);
+      a.sh.rotation.z += (0.85 - a.sh.rotation.z) * Math.min(1, dt * 12);
+      a.el.rotation.x += (-0.9 - a.el.rotation.x) * Math.min(1, dt * 12);
+      PP.torso.rotation.y += (0.3 - PP.torso.rotation.y) * sp2;
+    } else {
+      a.sh.rotation.x += (0.15 + sw * 0.25 - a.sh.rotation.x) * sp2;
+      a.sh.rotation.z += (0.12 - a.sh.rotation.z) * sp2;
+      a.el.rotation.x += (-0.55 - a.el.rotation.x) * sp2;
+    }
   }
   wobbleSword(sword, G.t, P.swordDrive);
   if (P.stagger > 0) PP.torso.rotation.x -= 0.3;
