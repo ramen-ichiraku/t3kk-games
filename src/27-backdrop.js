@@ -1,16 +1,34 @@
 /* ================= небо ================= */
 (function(){
-  var g = new THREE.SphereGeometry(520, 24, 16);
-  var col = [], pos = g.attributes.position;
-  for (var i = 0; i < pos.count; i++) {
-    var t = (pos.getY(i) / 520 + 1) * 0.5;
-    var r = 0.07 + Math.pow(1 - t, 3) * 0.42;
-    var gg = 0.08 + Math.pow(1 - t, 3) * 0.30;
-    var b = 0.12 + Math.pow(1 - t, 2.4) * 0.16;
-    col.push(r, gg, b);
+  var seg = 24, n = seg + 1, R = 520;
+  var pos = [], idx = [], col = [], nrm = [];
+  for (var j = 0; j < n; j++) for (var i = 0; i < n; i++) {
+    var u = i / seg * Math.PI * 2, v = j / seg * Math.PI;
+    var x = Math.sin(v) * Math.cos(u) * R, y = Math.cos(v) * R, z = Math.sin(v) * Math.sin(u) * R;
+    pos.push(x, y, z);
+    nrm.push(-x / R, -y / R, -z / R);
+    var t = (y / R + 1) * 0.5;
+    col.push(0.07 + Math.pow(1 - t, 3) * 0.42,
+             0.08 + Math.pow(1 - t, 3) * 0.30,
+             0.12 + Math.pow(1 - t, 2.4) * 0.16, 1);
   }
-  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  scene.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false })));
+  for (var j2 = 0; j2 < seg; j2++) for (var i2 = 0; i2 < seg; i2++) {
+    var a = j2 * n + i2, b = a + 1, c = a + n, d = c + 1;
+    idx.push(a, c, b, b, c, d);      // дивимось зсередини, тож намотка зворотна
+  }
+  var m = new BABYLON.Mesh('sky', bscene);
+  var vd = new BABYLON.VertexData();
+  vd.positions = pos; vd.indices = idx; vd.normals = nrm; vd.colors = col;
+  vd.applyToMesh(m);
+  var mat = new BABYLON.StandardMaterial('skymat', bscene);
+  mat.disableLighting = true;
+  mat.emissiveColor = new BABYLON.Color3(1, 1, 1);
+  mat.diffuseColor = new BABYLON.Color3(0, 0, 0);
+  mat.fogEnabled = false;
+  mat.backFaceCulling = false;
+  m.material = mat;
+  m.useVertexColors = true;
+  m.infiniteDistance = true;
 })();
 
 /* ================= золотий карась удалині ================= */
@@ -90,21 +108,31 @@ var bigKaras;
 
 /* далекі гори, щоб обрій не був порожній */
 (function(){
-  var g = new THREE.BufferGeometry();
-  var v = [], c = [];
+  var pos = [], idx = [], col = [], k = 0;
   for (var i = 0; i < 40; i++) {
     var a0 = i / 40 * Math.PI * 2, a1 = (i + 1) / 40 * Math.PI * 2;
     var R = 390, hgt = 52 + Math.sin(i * 2.3) * 30 + Math.cos(i * 0.9) * 20;
     var x0 = Math.cos(a0) * R, z0 = Math.sin(a0) * R;
     var x1 = Math.cos(a1) * R, z1 = Math.sin(a1) * R;
-    var mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
-    v.push(x0, -20, z0, x1, -20, z1, mx, hgt, mz);
-    for (var k = 0; k < 3; k++) c.push(0.10, 0.11, 0.14);
+    pos.push(x0, -20, z0, x1, -20, z1, (x0 + x1) / 2, hgt, (z0 + z1) / 2);
+    idx.push(k, k + 2, k + 1);
+    k += 3;
+    for (var c = 0; c < 3; c++) col.push(0.10, 0.11, 0.14, 1);
   }
-  g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(c, 3));
-  g.computeVertexNormals();
-  scene.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false })));
+  var nrm = [];
+  BABYLON.VertexData.ComputeNormals(pos, idx, nrm);
+  var m = new BABYLON.Mesh('mnt', bscene);
+  var vd = new BABYLON.VertexData();
+  vd.positions = pos; vd.indices = idx; vd.normals = nrm; vd.colors = col;
+  vd.applyToMesh(m);
+  var mat = new BABYLON.StandardMaterial('mntmat', bscene);
+  mat.disableLighting = true;
+  mat.emissiveColor = new BABYLON.Color3(1, 1, 1);
+  mat.diffuseColor = new BABYLON.Color3(0, 0, 0);
+  mat.fogEnabled = false;
+  mat.backFaceCulling = false;
+  m.material = mat;
+  m.useVertexColors = true;
 })();
 
 /* тло в сцені постійно; зона лише вмикає або гасить карася */

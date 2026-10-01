@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Проба: Кільце Карася на Babylon</title>
+<style>
+  html,body{height:100%;margin:0;background:#07080c;color:#e8e2d4;
+    font-family:'Rubik','Segoe UI',system-ui,sans-serif;overflow:hidden}
+  canvas{display:block;width:100%;height:100%;outline:none}
+  #hud{position:absolute;left:14px;top:12px;font-size:12.5px;line-height:1.6;
+    background:rgba(7,8,12,.62);border:1px solid rgba(224,183,79,.28);border-radius:5px;
+    padding:9px 12px;backdrop-filter:blur(6px);pointer-events:none;white-space:pre}
+  #hud b{color:#e0b74f}
+  #tip{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);font-size:12.5px;
+    background:rgba(7,8,12,.66);border:1px solid rgba(224,183,79,.3);border-radius:5px;padding:7px 13px}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="hud"></div>
+<div id="tip">WASD — рух, миша — камера, <b>Пробіл</b> — стрибок. Мета проби: піднятися сходами на поміст.</div>
+
+<script src="https://cdn.jsdelivr.net/npm/babylonjs@7.54.3/babylon.js"></script>
+<script>
+(function(){
+'use strict';
+if (typeof BABYLON === 'undefined') { document.body.innerHTML = '<p style="padding:24px">Не вдалося завантажити Babylon.</p>'; return; }
+
+var cv = document.getElementById('cv');
+var engine = new BABYLON.Engine(cv, true, { preserveDrawingBuffer: false, stencil: false });
+var scene = new BABYLON.Scene(engine);
+
+/* ---- атмосфера: ті самі кольори, що в поточній грі ---- */
+scene.clearColor = BABYLON.Color4.FromHexString('#10131aff');
+scene.fogMode = BABYLON.Scene.FOGMODE_LINEAR;
+scene.fogColor = BABYLON.Color3.FromHexString('#141821');
+scene.fogStart = 14; scene.fogEnd = 140;
+scene.collisionsEnabled = true;
+scene.gravity = new BABYLON.Vector3(0, -0.5, 0);
+var ip = scene.imageProcessingConfiguration;
+ip.toneMappingEnabled = true;
+ip.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
+ip.exposure = 0.92;
+
+var hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0.2, 1, 0.1), scene);
+hemi.intensity = 0.34;
+hemi.diffuse = BABYLON.Color3.FromHexString('#3d4760');
+hemi.groundColor = BABYLON.Color3.FromHexString('#17140f');
+var sun = new BABYLON.DirectionalLight('sun', new BABYLON.Vector3(0.5, -0.8, 0.6), scene);
+sun.intensity = 1.1;
+sun.diffuse = BABYLON.Color3.FromHexString('#ffc888');
+sun.position = new BABYLON.Vector3(-40, 60, -60);
+var shadows = new BABYLON.ShadowGenerator(1024, sun);
+shadows.useBlurExponentialShadowMap = true;
+shadows.blurScale = 2;
+
+/* ---- матеріали ---- */
+function mat(name, hex, emis){
+  var m = new BABYLON.StandardMaterial(name, scene);
+  m.diffuseColor = BABYLON.Color3.FromHexString(hex);
+  m.specularColor = new BABYLON.Color3(0.03, 0.03, 0.03);
+  if (emis) m.emissiveColor = BABYLON.Color3.FromHexString(emis);
+  return m;
+}
+var M = {
+  stone: mat('stone', '#383b43'), stoneD: mat('stoneD', '#24262c'), stoneL: mat('stoneL', '#474b55'),
+  scale: mat('scale', '#b99444'), scaleD: mat('scaleD', '#6f7238'),
+  skin: mat('skin', '#d8ab7c'), fin: mat('fin', '#d2762f'),
+  bread: mat('bread', '#dcb476', '#2a1c08'), crust: mat('crust', '#a9763c'),
+  wood: mat('wood', '#46392c'), dark: mat('dark', '#1b1d22'),
+  terr: (function(){ var m = new BABYLON.StandardMaterial('terr', scene);
+    m.specularColor = new BABYLON.Color3(0, 0, 0); return m; })()
+};
+
+/* ---- рельєф: та сама функція висоти, що в грі ---- */
+var ROAD = [[0,80],[3,56],[-4,34],[6,14],[4,-6]];
+function segDist(px,pz,ax,az,bx,bz){
+  var dx=bx-ax, dz=bz-az, L=dx*dx+dz*dz;
+  var t = L>0 ? ((px-ax)*dx+(pz-az)*dz)/L : 0;
+  t = t<0?0:(t>1?1:t);
+  return Math.hypot(px-(ax+dx*t), pz-(az+dz*t));
+}
+function roadDist(x,z){
+  var d=1e9;
+  for (var i=0;i<ROAD.length-1;i++){
+    var v=segDist(x,z,ROAD[i][0],ROAD[i][1],ROAD[i+1][0],ROAD[i+1][1]);
+    if (v<d) d=v;
+  }
+  return d;
+}
+function hAt(x,z){
+  var h = Math.sin(x*0.052)*1.2 + Math.cos(z*0.045)*1.0 + Math.sin((x+z)*0.026)*1.7;
+  h += Math.sin(x*0.132+1.7)*0.34 + Math.cos(z*0.148-0.6)*0.3;
+  var rd = Math.exp(-Math.pow(roadDist(x,z)/4.6,2));
+  h = h*(1-rd*0.9) - rd*0.22;
+  var r = Math.hypot(x,z);
+  if (r > 70) h += Math.min(15, Math.pow((r-70)*0.5, 1.9));
+  return h;
+}
+
+var TSEG = 140, TSIZE = 170;
+(function(){
+  var pos=[], idx=[], col=[], n=TSEG+1;
+  for (var j=0;j<n;j++) for (var i=0;i<n;i++){
+    var x = -TSIZE/2 + i*(TSIZE/TSEG);
+    var z = -TSIZE/2 + j*(TSIZE/TSEG);
+    var y = hAt(x,z);
+    pos.push(x,y,z);
+    var t = Math.max(0, 1-roadDist(x,z)/4.2);
+    var m = 0.78 + 0.42*(Math.sin(x*0.7)*Math.cos(z*0.6)*0.5+0.5);
+    col.push((0.115+t*0.10)*m, (0.125+t*0.075)*m, (0.095+t*0.055)*m, 1);
+  }
+  for (var j2=0;j2<TSEG;j2++) for (var i2=0;i2<TSEG;i2++){
+    var a=j2*n+i2, b=a+1, c=a+n, d=c+1;
+    idx.push(a,b,c, b,d,c);   // Babylon ліворукий: намотка протилежна до Three
+  }
+  var norm=[];
+  BABYLON.VertexData.ComputeNormals(pos, idx, norm);
+  var vd = new BABYLON.VertexData();
+  vd.positions=pos; vd.indices=idx; vd.normals=norm; vd.colors=col;
+  var terrain = new BABYLON.Mesh('terrain', scene);
+  vd.applyToMesh(terrain);
+  terrain.material = M.terr;
+  terrain.checkCollisions = true;     // саме це Three у нас не вміє без саморобства
+  terrain.receiveShadows = true;
+})();
+
+/* ---- ТЕ, ЗАРАДИ ЧОГО ПРОБА: сходи й поміст ---- */
+(function(){
+  var bx = 6, bz = 34, by = hAt(bx, bz);
+  // сходи з дванадцяти сходинок
+  for (var i = 0; i < 12; i++) {
+    var st = BABYLON.MeshBuilder.CreateBox('step'+i, { width: 5, height: 0.34, depth: 1.1 }, scene);
+    st.position.set(bx, by + 0.17 + i * 0.34, bz - i * 1.1);
+    st.material = M.stoneL;
+    st.checkCollisions = true;
+    st.receiveShadows = true;
+    shadows.addShadowCaster(st);
+  }
+  // поміст нагорі
+  var top = BABYLON.MeshBuilder.CreateBox('top', { width: 13, height: 0.6, depth: 11 }, scene);
+  top.position.set(bx, by + 4.08, bz - 18);
+  top.material = M.stone;
+  top.checkCollisions = true;
+  top.receiveShadows = true;
+  shadows.addShadowCaster(top);
+  // поручні, щоб було видно край
+  [-1, 1].forEach(function(s){
+    var r = BABYLON.MeshBuilder.CreateBox('rail', { width: 0.4, height: 1.1, depth: 11 }, scene);
+    r.position.set(bx + s * 6.3, by + 4.9, bz - 18);
+    r.material = M.stoneD;
+    r.checkCollisions = true;
+    shadows.addShadowCaster(r);
+  });
+  // колони на помості — перевірка бічних зіткнень
+  [[-3.5, -3], [3.5, -3], [-3.5, 3], [3.5, 3]].forEach(function(p){
+    var c = BABYLON.MeshBuilder.CreateCylinder('col', { diameterTop: 1.1, diameterBottom: 1.3, height: 5, tessellation: 8 }, scene);
+    c.position.set(bx + p[0], by + 6.9, bz - 18 + p[1]);
+    c.material = M.stoneL;
+    c.checkCollisions = true;
+    shadows.addShadowCaster(c);
+  });
+  var lint = BABYLON.MeshBuilder.CreateBox('lint', { width: 9, height: 0.8, depth: 8 }, scene);
+  lint.position.set(bx, by + 9.6, bz - 18);
+  lint.material = M.stoneD;
+  shadows.addShadowCaster(lint);
+})();
+
+/* ---- трохи реквізиту, щоб сцена була не порожня ---- */
+(function(){
+  var seed = 1337;
+  function rnd(){ seed = (seed*1664525+1013904223)%4294967296; return seed/4294967296; }
+  for (var i = 0; i < 70; i++) {
+    var a = rnd()*6.283, r = 10 + rnd()*55;
+    var x = Math.cos(a)*r, z = Math.sin(a)*r;
+    if (roadDist(x,z) < 4) continue;
+    var s = 0.4 + rnd()*1.6;
+    var m = BABYLON.MeshBuilder.CreatePolyhedron('rock'+i, { type: 2, size: s }, scene);
+    m.position.set(x, hAt(x,z) + s*0.4, z);
+    m.rotation.set(rnd()*3, rnd()*3, rnd()*3);
+    m.material = M.stone;
+    m.checkCollisions = s > 0.9;
+    m.receiveShadows = true;
+    if (s > 0.8) shadows.addShadowCaster(m);
+  }
+  for (var t = 0; t < 14; t++) {
+    var ta = rnd()*6.283, tr = 14 + rnd()*48;
+    var tx = Math.cos(ta)*tr, tz = Math.sin(ta)*tr;
+    if (roadDist(tx,tz) < 4) continue;
+    var h = 4 + rnd()*5;
+    var tree = BABYLON.MeshBuilder.CreateCylinder('tree'+t, { diameterTop: 0.34, diameterBottom: 0.9, height: h, tessellation: 6 }, scene);
+    tree.position.set(tx, hAt(tx,tz) + h/2, tz);
+    tree.material = M.wood;
+    tree.checkCollisions = true;
+    shadows.addShadowCaster(tree);
+  }
+})();
+
+/* ---- карась із ногами, руками й лисиною ---- */
+function buildFish(name, s){
+  var root = new BABYLON.TransformNode(name, scene);
+  var P = { legs: [], arms: [] };
+  var hip = new BABYLON.TransformNode(name+'hip', scene);
+  hip.parent = root; hip.position.y = 0.92*s;
+  P.hip = hip;
+  var torso = new BABYLON.TransformNode(name+'torso', scene);
+  torso.parent = hip; P.torso = torso;
+
+  function part(n, mesh, parent, mtl){
+    mesh.parent = parent; mesh.material = mtl;
+    shadows.addShadowCaster(mesh);
+    return mesh;
+  }
+  var body = BABYLON.MeshBuilder.CreateSphere(name+'body',
+    { diameterX: 0.72*s, diameterY: 0.99*s, diameterZ: 0.59*s, segments: 10 }, scene);
+  body.position.y = 0.16*s;
+  part(name+'body', body, torso, M.scale);
+
+  var belly = BABYLON.MeshBuilder.CreateSphere(name+'belly',
+    { diameterX: 0.53*s, diameterY: 0.63*s, diameterZ: 0.36*s, segments: 8 }, scene);
+  belly.position.set(0, 0.06*s, 0.12*s);
+  part(name+'belly', belly, torso, M.scaleD);
+
+  var dors = BABYLON.MeshBuilder.CreateCylinder(name+'dors',
+    { diameterTop: 0, diameterBottom: 0.4*s, height: 0.5*s, tessellation: 3 }, scene);
+  dors.position.set(0, 0.5*s, -0.2*s); dors.rotation.x = -0.5; dors.scaling.z = 0.3;
+  part(name+'dors', dors, torso, M.fin);
+
+  var tail = new BABYLON.TransformNode(name+'tail', scene);
+  tail.parent = torso; tail.position.set(0, -0.12*s, -0.3*s);
+  P.tail = tail;
+  var tfin = BABYLON.MeshBuilder.CreateCylinder(name+'tfin',
+    { diameterTop: 0, diameterBottom: 0.6*s, height: 0.62*s, tessellation: 4 }, scene);
+  tfin.rotation.x = Math.PI/2 + 0.25; tfin.scaling.z = 0.26; tfin.position.z = -0.3*s;
+  part(name+'tfin', tfin, tail, M.fin);
+
+  var head = new BABYLON.TransformNode(name+'head', scene);
+  head.parent = torso; head.position.y = 0.66*s;
+  P.head = head;
+  var skull = BABYLON.MeshBuilder.CreateSphere(name+'skull',
+    { diameterX: 0.5*s, diameterY: 0.52*s, diameterZ: 0.59*s, segments: 10 }, scene);
+  part(name+'skull', skull, head, M.scale);
+  var snout = BABYLON.MeshBuilder.CreateSphere(name+'snout', { diameter: 0.3*s, segments: 8 }, scene);
+  snout.position.set(0, -0.04*s, 0.26*s);
+  part(name+'snout', snout, head, M.scale);
+  var lips = BABYLON.MeshBuilder.CreateTorus(name+'lips',
+    { diameter: 0.17*s, thickness: 0.09*s, tessellation: 10 }, scene);
+  lips.position.set(0, -0.05*s, 0.37*s); lips.rotation.x = Math.PI/2;
+  part(name+'lips', lips, head, M.fin);
+  [-1, 1].forEach(function(sd, i){
+    var w = BABYLON.MeshBuilder.CreateSphere(name+'eye'+i, { diameter: 0.15*s, segments: 7 }, scene);
+    w.position.set(sd*0.19*s, 0.04*s, 0.17*s);
+    part(name+'eye'+i, w, head, M.skin);
+    var p = BABYLON.MeshBuilder.CreateSphere(name+'pup'+i, { diameter: 0.084*s, segments: 6 }, scene);
+    p.position.set(sd*0.22*s, 0.04*s, 0.21*s);
+    part(name+'pup'+i, p, head, M.dark);
+  });
+  // лисина
+  var pate = BABYLON.MeshBuilder.CreateSphere(name+'pate',
+    { diameterX: 0.48*s, diameterY: 0.4*s, diameterZ: 0.49*s, segments: 10, slice: 0.52 }, scene);
+  pate.position.set(0, 0.11*s, -0.01*s);
+  part(name+'pate', pate, head, M.skin);
+  P.hairs = [];
+  for (var h = 0; h < 3; h++) {
+    var hair = BABYLON.MeshBuilder.CreateCylinder(name+'hair'+h,
+      { diameterTop: 0.016*s, diameterBottom: 0.028*s, height: 0.26*s, tessellation: 4 }, scene);
+    hair.position.set((h-1)*0.07*s, 0.3*s, -0.02*s);
+    hair.parent = head; hair.material = M.wood;
+    P.hairs.push(hair);
+  }
+  [-1, 1].forEach(function(sd, i){
+    var sh = new BABYLON.TransformNode(name+'sh'+i, scene);
+    sh.parent = torso; sh.position.set(sd*0.33*s, 0.4*s, 0);
+    var up = BABYLON.MeshBuilder.CreateCylinder(name+'up'+i,
+      { diameterTop: 0.13*s, diameterBottom: 0.15*s, height: 0.34*s, tessellation: 6 }, scene);
+    up.position.y = -0.17*s;
+    part(name+'up'+i, up, sh, M.scale);
+    var el = new BABYLON.TransformNode(name+'el'+i, scene);
+    el.parent = sh; el.position.y = -0.34*s;
+    var fo = BABYLON.MeshBuilder.CreateCylinder(name+'fo'+i,
+      { diameterTop: 0.11*s, diameterBottom: 0.12*s, height: 0.32*s, tessellation: 6 }, scene);
+    fo.position.y = -0.16*s;
+    part(name+'fo'+i, fo, el, M.scale);
+    var hand = new BABYLON.TransformNode(name+'hand'+i, scene);
+    hand.parent = el; hand.position.y = -0.32*s;
+    var hm = BABYLON.MeshBuilder.CreateSphere(name+'hm'+i, { diameter: 0.15*s, segments: 6 }, scene);
+    part(name+'hm'+i, hm, hand, M.skin);
+    P.arms.push({ sh: sh, el: el, hand: hand });
+  });
+  [-1, 1].forEach(function(sd, i){
+    var hp = new BABYLON.TransformNode(name+'hp'+i, scene);
+    hp.parent = hip; hp.position.set(sd*0.17*s, -0.12*s, 0);
+    var th = BABYLON.MeshBuilder.CreateCylinder(name+'th'+i,
+      { diameterTop: 0.16*s, diameterBottom: 0.19*s, height: 0.42*s, tessellation: 6 }, scene);
+    th.position.y = -0.21*s;
+    part(name+'th'+i, th, hp, M.scale);
+    var kn = new BABYLON.TransformNode(name+'kn'+i, scene);
+    kn.parent = hp; kn.position.y = -0.42*s;
+    var sh2 = BABYLON.MeshBuilder.CreateCylinder(name+'sh2'+i,
+      { diameterTop: 0.14*s, diameterBottom: 0.15*s, height: 0.38*s, tessellation: 6 }, scene);
+    sh2.position.y = -0.19*s;
+    part(name+'sh2'+i, sh2, kn, M.scaleD);
+    var ft = BABYLON.MeshBuilder.CreateBox(name+'ft'+i, { width: 0.16*s, height: 0.1*s, depth: 0.3*s }, scene);
+    ft.position.set(0, -0.4*s, 0.06*s);
+    part(name+'ft'+i, ft, kn, M.dark);
+    P.legs.push({ hp: hp, kn: kn });
+  });
+  root.P = P;
+  return root;
+}
+
+/* ---- Жидінький Меч ---- */
+function buildSword(parent, s){
+  var g = new BABYLON.TransformNode('sword', scene);
+  g.parent = parent;
+  var grip = BABYLON.MeshBuilder.CreateCylinder('grip', { diameter: 0.1*s, height: 0.26*s, tessellation: 6 }, scene);
+  grip.parent = g; grip.position.y = -0.1*s; grip.material = M.crust;
+  var guard = BABYLON.MeshBuilder.CreateBox('guard', { width: 0.34*s, height: 0.05*s, depth: 0.09*s }, scene);
+  guard.parent = g; guard.position.y = 0.04*s; guard.material = M.crust;
+  var segs = [], prev = g, LEN = 0.21*s;
+  for (var i = 0; i < 7; i++) {
+    var j = new BABYLON.TransformNode('seg'+i, scene);
+    j.parent = prev; j.position.y = i === 0 ? 0.07*s : LEN;
+    var w = (0.155 - i*0.012)*s;
+    var b = BABYLON.MeshBuilder.CreateBox('blade'+i, { width: w, height: LEN*1.02, depth: 0.055*s }, scene);
+    b.parent = j; b.position.y = LEN/2; b.material = M.bread;
+    shadows.addShadowCaster(b);
+    segs.push(j); prev = j;
+  }
+  g.segs = segs;
+  return g;
+}
+
+/* ---- гравець ---- */
+var player = buildFish('p', 1.05);
+var PP = player.P;
+var sword = buildSword(PP.arms[1].hand, 1.05);
+sword.rotation.set(-Math.PI/2, 0, -0.16);
+
+// тіло, що бере на себе зіткнення
+var body = BABYLON.MeshBuilder.CreateBox('pbody', { width: 0.1, height: 0.1, depth: 0.1 }, scene);
+body.isVisible = false;
+body.position.set(0, hAt(0, 60) + 2, 60);
+body.checkCollisions = true;
+body.ellipsoid = new BABYLON.Vector3(0.45, 0.9, 0.45);
+body.ellipsoidOffset = new BABYLON.Vector3(0, 0.9, 0);
+player.parent = body;
+
+var P = { yaw: Math.PI, vy: 0, anim: 0, grounded: false, onSteps: false };
+
+/* ---- камера ---- */
+var cam = new BABYLON.UniversalCamera('cam', new BABYLON.Vector3(0, 5, 70), scene);
+cam.minZ = 0.1; cam.maxZ = 500; cam.fov = 1.08;
+scene.activeCamera = cam;
+var camYaw = 0, camPitch = 0.12, camYawS = 0, camPitchS = 0.12;
+
+/* ---- ввід ---- */
+var keys = {};
+window.addEventListener('keydown', function(e){
+  keys[e.code] = 1;
+  if (['KeyW','KeyA','KeyS','KeyD','Space'].indexOf(e.code) >= 0) e.preventDefault();
+});
+window.addEventListener('keyup', function(e){ keys[e.code] = 0; });
+var mdx = 0, mdy = 0, locked = false;
+cv.addEventListener('mousedown', function(){ if (!locked && cv.requestPointerLock) cv.requestPointerLock(); });
+document.addEventListener('pointerlockchange', function(){ locked = document.pointerLockElement === cv; });
+document.addEventListener('mousemove', function(e){ if (locked) { mdx += e.movementX||0; mdy += e.movementY||0; } });
+
+/* ---- цикл ---- */
+var hud = document.getElementById('hud');
+var hudT = 0, best = 0;
+scene.onBeforeRenderObservable.add(function(){
+  var dt = Math.min(0.05, engine.getDeltaTime() / 1000);
+
+  camYaw -= mdx * 0.0013;
+  camPitch += mdy * 0.001;
+  camPitch = Math.max(-0.4, Math.min(0.85, camPitch));
+  mdx = 0; mdy = 0;
+  camYawS += (camYaw - camYawS) * Math.min(1, dt * 9);
+  camPitchS += (camPitch - camPitchS) * Math.min(1, dt * 9);
+
+  var ix = 0, iz = 0;
+  if (keys.KeyW) iz += 1;
+  if (keys.KeyS) iz -= 1;
+  if (keys.KeyA) ix -= 1;
+  if (keys.KeyD) ix += 1;
+  var il = Math.hypot(ix, iz);
+  if (il > 1) { ix /= il; iz /= il; il = 1; }
+  var wx = -Math.sin(camYawS) * iz + Math.cos(camYawS) * ix;
+  var wz = -Math.cos(camYawS) * iz - Math.sin(camYawS) * ix;
+
+  var sp = 4.2 * il;
+  P.vy -= 24 * dt;
+  if (keys.Space && P.grounded) { P.vy = 7.4; P.grounded = false; }
+
+  var before = body.position.y;
+  body.moveWithCollisions(new BABYLON.Vector3(wx * sp * dt, P.vy * dt, wz * sp * dt));
+  // приземлення визначаємо по тому, що падіння зупинили
+  if (P.vy < 0 && Math.abs(body.position.y - before - P.vy * dt) > 1e-4) { P.vy = 0; P.grounded = true; }
+  else if (P.vy < -0.5) P.grounded = false;
+
+  if (il > 0.05) P.yaw += (function(a, b, k){
+    var d = ((b - a + Math.PI) % (Math.PI*2) + Math.PI*2) % (Math.PI*2) - Math.PI;
+    return d * k;
+  })(P.yaw, Math.atan2(wx, wz), Math.min(1, dt * 10));
+  player.rotation.y = P.yaw;
+
+  P.anim += il * dt * 9;
+  var sw = Math.sin(P.anim) * (il > 0.05 ? 1 : 0);
+  PP.legs[0].hp.rotation.x = sw * 0.66;
+  PP.legs[1].hp.rotation.x = -sw * 0.66;
+  PP.legs[0].kn.rotation.x = Math.max(0, -sw) * 0.85;
+  PP.legs[1].kn.rotation.x = Math.max(0, sw) * 0.85;
+  PP.arms[0].sh.rotation.x = -sw * 0.55;
+  PP.arms[1].sh.rotation.x = 0.15 + sw * 0.25;
+  PP.torso.rotation.x = 0.06 + (il > 0.05 ? 0.12 : 0);
+  PP.tail.rotation.y = Math.sin(P.anim * 0.9) * 0.3;
+  for (var h = 0; h < PP.hairs.length; h++) PP.hairs[h].rotation.z = Math.sin(performance.now()/180 + h) * 0.3;
+  sword.segs.forEach(function(j, i){
+    var k = (i+1)/7;
+    j.rotation.x = 0.1*k + Math.sin(performance.now()/140 - i*0.7) * 0.075 * k;
+  });
+
+  var tx = body.position.x, ty = body.position.y + 1.35, tz = body.position.z;
+  var dist = 6.2;
+  cam.position.set(
+    tx + Math.sin(camYawS) * Math.cos(camPitchS) * dist + Math.cos(camYawS) * 0.72,
+    ty + Math.sin(camPitchS) * dist + 0.4,
+    tz + Math.cos(camYawS) * Math.cos(camPitchS) * dist - Math.sin(camYawS) * 0.72
+  );
+  cam.setTarget(new BABYLON.Vector3(tx, ty + 0.55, tz));
+
+  hudT += dt;
+  if (hudT > 0.25) {
+    hudT = 0;
+    var fps = engine.getFps();
+    if (fps > best) best = fps;
+    hud.textContent =
+      'Babylon ' + BABYLON.Engine.Version + '\n' +
+      'кадрів: ' + fps.toFixed(0) + '  (пік ' + best.toFixed(0) + ')\n' +
+      'мешів: ' + scene.meshes.length + '\n' +
+      'висота: ' + body.position.y.toFixed(2) + '\n' +
+      'на землі: ' + (P.grounded ? 'так' : 'ні');
+  }
+});
+
+engine.runRenderLoop(function(){ scene.render(); });
+window.addEventListener('resize', function(){ engine.resize(); });
+window.__SPIKE = {
+  scene: scene, engine: engine, body: body,
+  tp: function(x, z){ body.position.set(x, hAt(x, z) + 2, z); },
+  state: function(){
+    return { y: body.position.y, x: body.position.x, z: body.position.z,
+      grounded: P.grounded, meshes: scene.meshes.length, fps: engine.getFps() };
+  },
+  press: function(k, on){ keys[k] = on ? 1 : 0; }
+};
+})();
+</script>
+</body>
+</html>

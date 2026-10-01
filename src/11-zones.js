@@ -17,22 +17,31 @@ function zoneEdge(){ return (ZONE && ZONE.edge) || EDGE; }
 
 /* рельєф зони: один меш із забарвленням по висоті й дорозі */
 function buildTerrainMesh(hFn, size, seg, tint){
-  var g = new THREE.PlaneGeometry(size, size, seg, seg);
-  g.rotateX(-Math.PI / 2);
-  var pos = g.attributes.position;
-  var col = [];
-  for (var i = 0; i < pos.count; i++) {
-    var x = pos.getX(i), z = pos.getZ(i);
+  var pos = [], idx = [], col = [], n = seg + 1, step = size / seg;
+  for (var j = 0; j < n; j++) for (var i = 0; i < n; i++) {
+    var x = -size / 2 + i * step, z = -size / 2 + j * step;
     var y = hFn(x, z);
-    pos.setY(i, y);
+    pos.push(x, y, z);
     var c = tint(x, z, y);
-    col.push(c[0], c[1], c[2]);
+    col.push(c[0], c[1], c[2], 1);
   }
-  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  g.computeVertexNormals();
-  var m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
-  m.receiveShadow = !LOWFX;
-  return m;
+  for (var j2 = 0; j2 < seg; j2++) for (var i2 = 0; i2 < seg; i2++) {
+    var a = j2 * n + i2, b = a + 1, c2 = a + n, d = c2 + 1;
+    idx.push(a, b, c2, b, d, c2);     // намотка Babylon: інакше колайдер не бачить поверхню
+  }
+  var nrm = [];
+  BABYLON.VertexData.ComputeNormals(pos, idx, nrm);
+  var m = new BABYLON.Mesh('terrain', bscene);
+  var vd = new BABYLON.VertexData();
+  vd.positions = pos; vd.indices = idx; vd.normals = nrm; vd.colors = col;
+  vd.applyToMesh(m);
+  var mat = new BABYLON.StandardMaterial('terrmat', bscene);
+  mat.specularColor = new BABYLON.Color3(0, 0, 0);
+  m.material = mat;
+  m.useVertexColors = true;
+  m.receiveShadows = !LOWFX;
+  m.checkCollisions = true;          // саме це дає сходи й схили
+  return decorate(m);
 }
 
 /* звільнення: геометрії завжди, матеріали — лише не спільні */
@@ -73,9 +82,9 @@ function applySky(sk){
   scene.fog.color.setHex(sk.fog);
   scene.fog.near = sk.near;
   scene.fog.far = sk.far;
-  if (sk.sun !== undefined) sun.intensity = sk.sun;
-  if (sk.amb !== undefined) amb.intensity = sk.amb;
-  if (sk.hemi !== undefined) hemi.intensity = sk.hemi;
+  if (sk.sun !== undefined) sun.intensity = sk.sun * GAIN.dir;
+  if (sk.amb !== undefined) amb.intensity = sk.amb * GAIN.amb;
+  if (sk.hemi !== undefined) hemi.intensity = sk.hemi * GAIN.hemi;
 }
 
 function loadZone(id, at){

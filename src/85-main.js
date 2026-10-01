@@ -158,6 +158,10 @@ function animateWorld(dt){
 /* налагоджувальний гачок для перевірок */
 window.__K3 = { P: P, G: G, foes: foes, getBoss: function(){ return boss; }, keys: keys,
   look: function(p, y){ camPitch = p; if (y !== undefined) camYaw = y; },
+  hurtBoss: function(d){ hurtBoss(d); },
+  atk: function(h){ attack(h); },
+  hit: function(){ doHitCheck(); },
+  freezeBoss: function(){ var b = boss; b.st = 'idle'; b.t = -999; b.next = 999; },
   scene: scene, cam: camera, karasObj: function(){ return bigKaras; }, THREE: THREE,
   karas: function(){ var v = bigKaras.position.clone(); v.project(camera); return { x: v.x.toFixed(2), y: v.y.toFixed(2), z: v.z.toFixed(2) }; },
   tp: function(x, z){ P.x = x; P.z = z; P.y = hAt(x, z); } };

@@ -1,9 +1,9 @@
 
 var elErr = document.getElementById('err');
-if (typeof THREE === 'undefined') {
+if (typeof BABYLON === 'undefined') {
   elErr.style.display = 'grid';
   elErr.innerHTML = '<div><b>Не вдалося завантажити рушій.</b><br>' +
-    '«Кільце Карася» тягне Three.js із мережі. Перевір інтернет і онови сторінку.<br><br>' +
+    '«Кільце Карася» тягне рушій Babylon із мережі. Перевір інтернет і онови сторінку.<br><br>' +
     '<a href="./" style="color:#e0b74f">← повернутися до збірки</a></div>';
   return;
 }

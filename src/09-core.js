@@ -1,5 +1,4 @@
 /* ================= налаштування ================= */
-var LOWFX = /(\?|&)fx=low/.test(location.search);
 var RIM = 130, EDGE = 140;               // де починається круча і де стіна
 var GRAV = 24, PR = 0.44;                // тяжіння і радіус гравця
 var WALK = 3.6, RUN = 6.4;
@@ -29,6 +28,7 @@ renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.92;
 document.body.insertBefore(renderer.domElement, document.getElementById('fade'));
+engine.resize();
 
 var scene = new THREE.Scene();
 var SKY = 0x10131a, FOGC = 0x141821;

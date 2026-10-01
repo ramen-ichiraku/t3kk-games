@@ -205,22 +205,365 @@ canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
   <a class="back" id="bBack" href="./">← Ігри</a>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/babylonjs@7.54.3/babylon.js"></script>
 <script>
 (function(){
 'use strict';
 
 var elErr = document.getElementById('err');
-if (typeof THREE === 'undefined') {
+if (typeof BABYLON === 'undefined') {
   elErr.style.display = 'grid';
   elErr.innerHTML = '<div><b>Не вдалося завантажити рушій.</b><br>' +
-    '«Кільце Карася» тягне Three.js із мережі. Перевір інтернет і онови сторінку.<br><br>' +
+    '«Кільце Карася» тягне рушій Babylon із мережі. Перевір інтернет і онови сторінку.<br><br>' +
     '<a href="./" style="color:#e0b74f">← повернутися до збірки</a></div>';
   return;
 }
 
-/* ================= налаштування ================= */
+/* ================= шар сумісності з Three =================
+   Гра написана під Three.js, але рушієм тепер Babylon — заради вбудованих
+   зіткнень із довільною геометрією (сходи, поверхи, мури), яких пласка
+   саморобна модель не вміє в принципі.
+
+   Замість переписувати три сотні місць створення геометрії, тут зроблено
+   тонкий шар: THREE.Mesh повертає справжній меш Babylon, THREE.Group —
+   TransformNode, і далі гра працює незмінним кодом. Усе, що отримує цей
+   меш — зіткнення, тіні, інстанси — це вже можливості Babylon.
+
+   Babylon ліворукий. Наша формула повороту (yaw -> вектор (sin, cos))
+   у ньому збігається, а от намотка трикутників власної геометрії
+   протилежна — див. buildTerrainMesh і тло. */
+
 var LOWFX = /(\?|&)fx=low/.test(location.search);
+
+var __cv = document.createElement('canvas');
+__cv.id = 'cv';
+__cv.style.cssText = 'display:block;position:absolute;inset:0;width:100%;height:100%;outline:none';
+var engine = new BABYLON.Engine(__cv, !LOWFX, { stencil: false, preserveDrawingBuffer: false, antialias: !LOWFX });
+var bscene = new BABYLON.Scene(engine);
+bscene.collisionsEnabled = true;
+bscene.ambientColor = new BABYLON.Color3(0, 0, 0);
+var shadowGen = null;
+/* Babylon реагує на світло інакше за Three: один спільний регулятор,
+   щоб не правити інтенсивність у кожній лампі окремо */
+var GAIN = { point: 3.6, dir: 3.4, hemi: 3.4, amb: 3.2 };
+
+var __n = 0;
+function __nn(p){ return p + (++__n); }
+function col3(c){
+  if (c && c.r !== undefined) return new BABYLON.Color3(c.r, c.g, c.b);
+  var h = (typeof c === 'string') ? parseInt(c.replace('#', ''), 16) : (c | 0);
+  return new BABYLON.Color3(((h >> 16) & 255) / 255, ((h >> 8) & 255) / 255, (h & 255) / 255);
+}
+
+/* ---- доповнення до векторів і кольорів, яких у Babylon нема ---- */
+var V3 = BABYLON.Vector3.prototype, C3 = BABYLON.Color3.prototype;
+V3.lerp = function(v, k){ this.x += (v.x - this.x) * k; this.y += (v.y - this.y) * k; this.z += (v.z - this.z) * k; return this; };
+V3.copy = function(v){ this.x = v.x; this.y = v.y; this.z = v.z; return this; };
+V3.setScalar = function(s){ this.x = this.y = this.z = s; return this; };
+V3.distanceTo = function(v){ return BABYLON.Vector3.Distance(this, v); };
+V3.toArray = function(){ return [this.x, this.y, this.z]; };
+V3.sub = function(v){ this.x -= v.x; this.y -= v.y; this.z -= v.z; return this; };
+V3.project = function(cam){
+  var e = engine, vp = cam.__b.viewport.toGlobal(e.getRenderWidth(), e.getRenderHeight());
+  var p = BABYLON.Vector3.Project(this, BABYLON.Matrix.Identity(),
+    bscene.getTransformMatrix(), vp);
+  this.x = (p.x / e.getRenderWidth()) * 2 - 1;
+  this.y = -((p.y / e.getRenderHeight()) * 2 - 1);
+  this.z = p.z;
+  return this;
+};
+C3.setHex = function(h){ var c = col3(h); this.r = c.r; this.g = c.g; this.b = c.b; return this; };
+C3.getHex = function(){ return (Math.round(this.r * 255) << 16) | (Math.round(this.g * 255) << 8) | Math.round(this.b * 255); };
+C3.lerp = function(c, k){ this.r += (c.r - this.r) * k; this.g += (c.g - this.g) * k; this.b += (c.b - this.b) * k; return this; };
+C3.getHexString = function(){ return ('000000' + this.getHex().toString(16)).slice(-6); };
+
+/* ---- спільні властивості для мешів і вузлів ---- */
+function decorate(o){
+  o.isMesh = !!o.getTotalVertices;
+  o.add = function(c){ c.parent = o; return o; };
+  o.remove = function(c){ if (c.parent === o) c.parent = null; return o; };
+  Object.defineProperty(o, 'scale', { get: function(){ return o.scaling; }, configurable: true });
+  Object.defineProperty(o, 'castShadow', {
+    set: function(v){ if (v && shadowGen && o.getTotalVertices) shadowGen.addShadowCaster(o, true); },
+    get: function(){ return false; }, configurable: true
+  });
+  // у Babylon видимість зветься інакше, а Three ховає і нащадків
+  Object.defineProperty(o, 'visible', {
+    get: function(){ return o.isEnabled ? o.isEnabled(false) : true; },
+    set: function(v){ if (o.setEnabled) o.setEnabled(!!v); },
+    configurable: true
+  });
+  Object.defineProperty(o, 'receiveShadow', {
+    set: function(v){ o.receiveShadows = !!v; }, get: function(){ return o.receiveShadows; }, configurable: true
+  });
+  o.traverse = function(fn){
+    fn(o);
+    var kids = o.getChildren ? o.getChildren() : [];
+    for (var i = 0; i < kids.length; i++) if (kids[i].traverse) kids[i].traverse(fn); else fn(kids[i]);
+  };
+  o.getWorldPosition = function(t){
+    o.computeWorldMatrix(true);
+    var p = o.getAbsolutePosition();
+    if (t) { t.x = p.x; t.y = p.y; t.z = p.z; return t; }
+    return p.clone();
+  };
+  if (!o.userData) o.userData = {};
+  return o;
+}
+
+/* ---- геометрія: описи, які матеріалізує THREE.Mesh ---- */
+function geo(k, a){ return { __geo: k, a: a }; }
+function buildGeo(g){
+  var a = g.a, m;
+  switch (g.__geo) {
+    case 'box':
+      return BABYLON.MeshBuilder.CreateBox(__nn('box'), { width: a[0], height: a[1], depth: a[2] }, bscene);
+    case 'sphere': {
+      var o = { diameter: a[0] * 2, segments: Math.max(4, Math.round((a[1] || 12) / 2)) };
+      if (a[4] !== undefined) o.slice = a[4] / Math.PI;      // напівсфера для лисини
+      return BABYLON.MeshBuilder.CreateSphere(__nn('sph'), o, bscene);
+    }
+    case 'cyl':
+      return BABYLON.MeshBuilder.CreateCylinder(__nn('cyl'),
+        { diameterTop: a[0] * 2, diameterBottom: a[1] * 2, height: a[2], tessellation: a[3] || 8 }, bscene);
+    case 'cone':
+      return BABYLON.MeshBuilder.CreateCylinder(__nn('cone'),
+        { diameterTop: 0, diameterBottom: a[0] * 2, height: a[1], tessellation: a[2] || 6 }, bscene);
+    case 'torus': {
+      // у Babylon CreateTorus не вміє дуги, тож неповний тор робимо трубкою по шляху
+      var tr = a[0], tt = a[1], ts = a[2] || 12, arc = a[3] === undefined ? Math.PI * 2 : a[3];
+      if (arc >= Math.PI * 2 - 1e-3)
+        return BABYLON.MeshBuilder.CreateTorus(__nn('tor'),
+          { diameter: tr * 2, thickness: tt * 2, tessellation: ts }, bscene);
+      var pathPts = [];
+      for (var pi = 0; pi <= ts; pi++) {
+        var an = arc * pi / ts;
+        pathPts.push(new BABYLON.Vector3(Math.cos(an) * tr, Math.sin(an) * tr, 0));
+      }
+      return BABYLON.MeshBuilder.CreateTube(__nn('tube'),
+        { path: pathPts, radius: tt, tessellation: 6, cap: BABYLON.Mesh.CAP_ALL }, bscene);
+    }
+    case 'poly':
+      return BABYLON.MeshBuilder.CreatePolyhedron(__nn('poly'), { type: 2, size: a[0] * 0.62 }, bscene);
+    case 'plane':
+      return BABYLON.MeshBuilder.CreatePlane(__nn('pl'),
+        { width: a[0], height: a[1], sideOrientation: BABYLON.Mesh.DOUBLESIDE }, bscene);
+    case 'ring': {
+      // пласке кільце в площині XY, як у Three, щоб повороти в коді збіглися
+      var ri = a[0], ro = a[1], seg = a[2] || 20;
+      var pos = [], idx = [], nrm = [];
+      for (var i = 0; i <= seg; i++) {
+        var an = i / seg * Math.PI * 2;
+        pos.push(Math.cos(an) * ri, Math.sin(an) * ri, 0);
+        pos.push(Math.cos(an) * ro, Math.sin(an) * ro, 0);
+        nrm.push(0, 0, 1, 0, 0, 1);
+      }
+      for (var k = 0; k < seg; k++) {
+        var b0 = k * 2;
+        idx.push(b0, b0 + 1, b0 + 2, b0 + 1, b0 + 3, b0 + 2);
+      }
+      m = new BABYLON.Mesh(__nn('ring'), bscene);
+      var vd = new BABYLON.VertexData();
+      vd.positions = pos; vd.indices = idx; vd.normals = nrm;
+      vd.applyToMesh(m);
+      return m;
+    }
+    case 'buffer':
+      return new BABYLON.Mesh(__nn('buf'), bscene);
+  }
+  return BABYLON.MeshBuilder.CreateBox(__nn('fallback'), { size: 1 }, bscene);
+}
+
+/* ---- матеріали ---- */
+function makeMat(o, basic){
+  o = o || {};
+  var m = new BABYLON.StandardMaterial(__nn('mat'), bscene);
+  m.specularColor = new BABYLON.Color3(0.015, 0.015, 0.015);
+  m.diffuseColor = o.color !== undefined ? col3(o.color) : new BABYLON.Color3(1, 1, 1);
+  m.emissiveColor = o.emissive !== undefined ? col3(o.emissive) : new BABYLON.Color3(0, 0, 0);
+  if (basic) { m.disableLighting = true; m.emissiveColor = o.color !== undefined ? col3(o.color) : new BABYLON.Color3(1, 1, 1); m.diffuseColor = new BABYLON.Color3(0, 0, 0); }
+  if (o.transparent || o.opacity !== undefined) m.alpha = o.opacity === undefined ? 1 : o.opacity;
+  if (o.side === 2) m.backFaceCulling = false;
+  else if (o.side === 1) m.sideOrientation = BABYLON.Material.ClockWiseSideOrientation;
+  if (o.fog === false) m.fogEnabled = false;
+  if (o.depthWrite === false) m.disableDepthWrite = true;
+  m.__vcol = !!o.vertexColors;
+  Object.defineProperty(m, 'emissive', { get: function(){ return m.emissiveColor; }, configurable: true });
+  Object.defineProperty(m, 'color', { get: function(){ return m.diffuseColor; }, configurable: true });
+  Object.defineProperty(m, 'opacity', { get: function(){ return m.alpha; }, set: function(v){ m.alpha = v; }, configurable: true });
+  Object.defineProperty(m, 'transparent', { get: function(){ return m.alpha < 1; }, set: function(){}, configurable: true });
+  m.clone0 = m.clone;
+  m.clone = function(){ var c = m.clone0(__nn('mat')); return decorateMat(c); };
+  return m;
+}
+function decorateMat(m){
+  Object.defineProperty(m, 'emissive', { get: function(){ return m.emissiveColor; }, configurable: true });
+  Object.defineProperty(m, 'opacity', { get: function(){ return m.alpha; }, set: function(v){ m.alpha = v; }, configurable: true });
+  Object.defineProperty(m, 'transparent', { get: function(){ return m.alpha < 1; }, set: function(){}, configurable: true });
+  if (!m.userData) m.userData = {};
+  m.clone0 = m.clone0 || m.clone;
+  m.clone = function(){ return decorateMat(m.clone0(__nn('mat'))); };
+  return m;
+}
+
+/* ---- інстанси ---- */
+function InstancedShim(g, mat, count){
+  var mesh = buildGeo(g);
+  mesh.material = mat;
+  var buf = new Float32Array(count * 16);
+  mesh.count = count;
+  mesh.setMatrixAt = function(i, m4){ m4.__m.copyToArray(buf, i * 16); };
+  mesh.instanceMatrix = { needsUpdate: false };
+  Object.defineProperty(mesh.instanceMatrix, 'needsUpdate', {
+    set: function(v){ if (v) mesh.thinInstanceSetBuffer('matrix', buf, 16); },
+    get: function(){ return false; }
+  });
+  return decorate(mesh);
+}
+
+/* ---- фасад ---- */
+var THREE = {
+  PCFSoftShadowMap: 1, sRGBEncoding: 1, ACESFilmicToneMapping: 1,
+  FrontSide: 0, BackSide: 1, DoubleSide: 2,
+
+  Vector2: function(x, y){ return new BABYLON.Vector2(x || 0, y || 0); },
+  Vector3: function(x, y, z){ return new BABYLON.Vector3(x || 0, y || 0, z || 0); },
+  Color: function(c){ return col3(c); },
+  Euler: function(){ var e = { x: 0, y: 0, z: 0 }; e.set = function(a, b, c){ e.x = a; e.y = b; e.z = c; return e; }; return e; },
+  Quaternion: function(){
+    var q = { __q: BABYLON.Quaternion.Identity() };
+    q.setFromEuler = function(e){ q.__q = BABYLON.Quaternion.FromEulerAngles(e.x, e.y, e.z); return q; };
+    return q;
+  },
+  Matrix4: function(){
+    var o = { __m: BABYLON.Matrix.Identity() };
+    o.makeScale = function(x, y, z){ o.__m = BABYLON.Matrix.Scaling(x, y, z); return o; };
+    o.compose = function(p, q, s){
+      o.__m = BABYLON.Matrix.Compose(new BABYLON.Vector3(s.x, s.y, s.z), q.__q, new BABYLON.Vector3(p.x, p.y, p.z));
+      return o;
+    };
+    return o;
+  },
+
+  BoxGeometry: function(w, h, d){ return geo('box', [w, h, d]); },
+  SphereGeometry: function(r, ws, hs, ps, pl, ts, tl){ return geo('sphere', [r, ws, hs, ts, tl]); },
+  CylinderGeometry: function(rt, rb, h, rs){ return geo('cyl', [rt, rb, h, rs]); },
+  ConeGeometry: function(r, h, rs){ return geo('cone', [r, h, rs]); },
+  TorusGeometry: function(r, t, rs, ts, arc){ return geo('torus', [r, t, ts, arc]); },
+  DodecahedronGeometry: function(r){ return geo('poly', [r]); },
+  PlaneGeometry: function(w, h, ws, hs){ return geo('plane', [w, h, ws, hs]); },
+  RingGeometry: function(ri, ro, s){ return geo('ring', [ri, ro, s]); },
+  BufferGeometry: function(){ return geo('buffer', []); },
+  Float32BufferAttribute: function(arr, n){ return { array: arr, itemSize: n }; },
+
+  MeshLambertMaterial: function(o){ return makeMat(o, false); },
+  MeshBasicMaterial: function(o){ return makeMat(o, true); },
+
+  Group: function(){ return decorate(new BABYLON.TransformNode(__nn('grp'), bscene)); },
+  Mesh: function(g, mat){
+    var m = buildGeo(g);
+    if (mat) { m.material = mat; if (mat.__vcol) m.useVertexColors = true; }
+    return decorate(m);
+  },
+  InstancedMesh: function(g, mat, count){ return InstancedShim(g, mat, count); },
+
+  PointLight: function(c, i, dist){
+    var L = new BABYLON.PointLight(__nn('pl'), BABYLON.Vector3.Zero(), bscene);
+    L.diffuse = col3(c); L.specular = new BABYLON.Color3(0, 0, 0);
+    L.intensity = (i === undefined ? 1 : i) * GAIN.point;
+    if (dist) L.range = dist;
+    return decorate(L);
+  },
+  DirectionalLight: function(c, i){
+    var L = new BABYLON.DirectionalLight(__nn('dl'), new BABYLON.Vector3(0.4, -1, 0.4), bscene);
+    L.diffuse = col3(c); L.specular = new BABYLON.Color3(0, 0, 0);
+    L.intensity = (i === undefined ? 1 : i) * GAIN.dir;
+    L.target = { position: new BABYLON.Vector3(0, 0, 0), updateMatrixWorld: function(){
+      L.direction = L.target.position.subtract(L.position).normalize();
+    } };
+    L.shadow = { mapSize: { set: function(){} }, camera: {}, bias: 0 };
+    Object.defineProperty(L, 'castShadow', {
+      set: function(v){ if (v && !shadowGen) { shadowGen = new BABYLON.ShadowGenerator(LOWFX ? 512 : 1024, L); shadowGen.useExponentialShadowMap = true; shadowGen.darkness = 0.45; } },
+      get: function(){ return !!shadowGen; }, configurable: true
+    });
+    return L;
+  },
+  HemisphereLight: function(sky, ground, i){
+    var L = new BABYLON.HemisphericLight(__nn('hl'), new BABYLON.Vector3(0.2, 1, 0.1), bscene);
+    L.diffuse = col3(sky); L.groundColor = col3(ground); L.specular = new BABYLON.Color3(0, 0, 0);
+    L.intensity = (i === undefined ? 1 : i) * GAIN.hemi;
+    return L;
+  },
+  AmbientLight: function(c, i){
+    var L = new BABYLON.HemisphericLight(__nn('al'), new BABYLON.Vector3(0, 1, 0), bscene);
+    L.diffuse = col3(c); L.groundColor = col3(c); L.specular = new BABYLON.Color3(0, 0, 0);
+    L.intensity = (i === undefined ? 1 : i) * GAIN.amb;
+    return L;
+  },
+
+  Fog: function(c, near, far){
+    bscene.fogMode = BABYLON.Scene.FOGMODE_LINEAR;
+    bscene.fogColor = col3(c);
+    bscene.fogStart = near; bscene.fogEnd = far;
+    var f = {};
+    Object.defineProperty(f, 'color', { get: function(){ return bscene.fogColor; } });
+    Object.defineProperty(f, 'near', { get: function(){ return bscene.fogStart; }, set: function(v){ bscene.fogStart = v; } });
+    Object.defineProperty(f, 'far', { get: function(){ return bscene.fogEnd; }, set: function(v){ bscene.fogEnd = v; } });
+    return f;
+  },
+
+  Scene: function(){
+    var s = { __b: bscene, children: [] };
+    var bg = new BABYLON.Color3(0.06, 0.07, 0.1);
+    bscene.clearColor = new BABYLON.Color4(bg.r, bg.g, bg.b, 1);
+    var bgProxy = col3(0x10131a);
+    bgProxy.setHex = function(h){ var c = col3(h); bscene.clearColor = new BABYLON.Color4(c.r, c.g, c.b, 1); return bgProxy; };
+    s.background = bgProxy;
+    s.fog = null;
+    s.add = function(o){ if (o && o.parent === undefined) {} return s; };
+    s.remove = function(o){ if (o && o.setEnabled) o.setEnabled(false); return s; };
+    s.traverse = function(fn){ bscene.meshes.forEach(fn); };
+    return s;
+  },
+
+  PerspectiveCamera: function(fovDeg, aspect, near, far){
+    var c = new BABYLON.UniversalCamera(__nn('cam'), new BABYLON.Vector3(0, 5, 10), bscene);
+    c.fov = fovDeg * Math.PI / 180;
+    c.minZ = near; c.maxZ = far;
+    c.inputs.clear();
+    bscene.activeCamera = c;
+    var o = { __b: c };
+    o.position = c.position;
+    o.lookAt = function(x, y, z){ c.setTarget(new BABYLON.Vector3(x, y, z)); };
+    o.updateProjectionMatrix = function(){};
+    o.updateMatrixWorld = function(){};
+    Object.defineProperty(o, 'aspect', { get: function(){ return 1; }, set: function(){}, configurable: true });
+    Object.defineProperty(o, 'far', { get: function(){ return c.maxZ; }, configurable: true });
+    return o;
+  },
+
+  WebGLRenderer: function(){
+    var r = {
+      domElement: __cv,
+      shadowMap: { enabled: false, type: 1 },
+      outputEncoding: 1, toneMapping: 1,
+      setPixelRatio: function(v){ engine.setHardwareScalingLevel(1 / Math.max(0.5, v)); },
+      setSize: function(){ engine.resize(); },
+      render: function(){ bscene.render(); }
+    };
+    Object.defineProperty(r, 'toneMappingExposure', {
+      set: function(v){
+        var ip = bscene.imageProcessingConfiguration;
+        ip.toneMappingEnabled = true;
+        ip.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
+        ip.exposure = v;
+      },
+      get: function(){ return bscene.imageProcessingConfiguration.exposure; }, configurable: true
+    });
+    return r;
+  }
+};
+/* ================= налаштування ================= */
 var RIM = 130, EDGE = 140;               // де починається круча і де стіна
 var GRAV = 24, PR = 0.44;                // тяжіння і радіус гравця
 var WALK = 3.6, RUN = 6.4;
@@ -250,6 +593,7 @@ renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.92;
 document.body.insertBefore(renderer.domElement, document.getElementById('fade'));
+engine.resize();
 
 var scene = new THREE.Scene();
 var SKY = 0x10131a, FOGC = 0x141821;
@@ -293,22 +637,31 @@ function zoneEdge(){ return (ZONE && ZONE.edge) || EDGE; }
 
 /* рельєф зони: один меш із забарвленням по висоті й дорозі */
 function buildTerrainMesh(hFn, size, seg, tint){
-  var g = new THREE.PlaneGeometry(size, size, seg, seg);
-  g.rotateX(-Math.PI / 2);
-  var pos = g.attributes.position;
-  var col = [];
-  for (var i = 0; i < pos.count; i++) {
-    var x = pos.getX(i), z = pos.getZ(i);
+  var pos = [], idx = [], col = [], n = seg + 1, step = size / seg;
+  for (var j = 0; j < n; j++) for (var i = 0; i < n; i++) {
+    var x = -size / 2 + i * step, z = -size / 2 + j * step;
     var y = hFn(x, z);
-    pos.setY(i, y);
+    pos.push(x, y, z);
     var c = tint(x, z, y);
-    col.push(c[0], c[1], c[2]);
+    col.push(c[0], c[1], c[2], 1);
   }
-  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  g.computeVertexNormals();
-  var m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
-  m.receiveShadow = !LOWFX;
-  return m;
+  for (var j2 = 0; j2 < seg; j2++) for (var i2 = 0; i2 < seg; i2++) {
+    var a = j2 * n + i2, b = a + 1, c2 = a + n, d = c2 + 1;
+    idx.push(a, b, c2, b, d, c2);     // намотка Babylon: інакше колайдер не бачить поверхню
+  }
+  var nrm = [];
+  BABYLON.VertexData.ComputeNormals(pos, idx, nrm);
+  var m = new BABYLON.Mesh('terrain', bscene);
+  var vd = new BABYLON.VertexData();
+  vd.positions = pos; vd.indices = idx; vd.normals = nrm; vd.colors = col;
+  vd.applyToMesh(m);
+  var mat = new BABYLON.StandardMaterial('terrmat', bscene);
+  mat.specularColor = new BABYLON.Color3(0, 0, 0);
+  m.material = mat;
+  m.useVertexColors = true;
+  m.receiveShadows = !LOWFX;
+  m.checkCollisions = true;          // саме це дає сходи й схили
+  return decorate(m);
 }
 
 /* звільнення: геометрії завжди, матеріали — лише не спільні */
@@ -349,9 +702,9 @@ function applySky(sk){
   scene.fog.color.setHex(sk.fog);
   scene.fog.near = sk.near;
   scene.fog.far = sk.far;
-  if (sk.sun !== undefined) sun.intensity = sk.sun;
-  if (sk.amb !== undefined) amb.intensity = sk.amb;
-  if (sk.hemi !== undefined) hemi.intensity = sk.hemi;
+  if (sk.sun !== undefined) sun.intensity = sk.sun * GAIN.dir;
+  if (sk.amb !== undefined) amb.intensity = sk.amb * GAIN.amb;
+  if (sk.hemi !== undefined) hemi.intensity = sk.hemi * GAIN.hemi;
 }
 
 function loadZone(id, at){
@@ -634,17 +987,35 @@ function setSound(on){
 
 /* ================= небо ================= */
 (function(){
-  var g = new THREE.SphereGeometry(520, 24, 16);
-  var col = [], pos = g.attributes.position;
-  for (var i = 0; i < pos.count; i++) {
-    var t = (pos.getY(i) / 520 + 1) * 0.5;
-    var r = 0.07 + Math.pow(1 - t, 3) * 0.42;
-    var gg = 0.08 + Math.pow(1 - t, 3) * 0.30;
-    var b = 0.12 + Math.pow(1 - t, 2.4) * 0.16;
-    col.push(r, gg, b);
+  var seg = 24, n = seg + 1, R = 520;
+  var pos = [], idx = [], col = [], nrm = [];
+  for (var j = 0; j < n; j++) for (var i = 0; i < n; i++) {
+    var u = i / seg * Math.PI * 2, v = j / seg * Math.PI;
+    var x = Math.sin(v) * Math.cos(u) * R, y = Math.cos(v) * R, z = Math.sin(v) * Math.sin(u) * R;
+    pos.push(x, y, z);
+    nrm.push(-x / R, -y / R, -z / R);
+    var t = (y / R + 1) * 0.5;
+    col.push(0.07 + Math.pow(1 - t, 3) * 0.42,
+             0.08 + Math.pow(1 - t, 3) * 0.30,
+             0.12 + Math.pow(1 - t, 2.4) * 0.16, 1);
   }
-  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  scene.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false })));
+  for (var j2 = 0; j2 < seg; j2++) for (var i2 = 0; i2 < seg; i2++) {
+    var a = j2 * n + i2, b = a + 1, c = a + n, d = c + 1;
+    idx.push(a, c, b, b, c, d);      // дивимось зсередини, тож намотка зворотна
+  }
+  var m = new BABYLON.Mesh('sky', bscene);
+  var vd = new BABYLON.VertexData();
+  vd.positions = pos; vd.indices = idx; vd.normals = nrm; vd.colors = col;
+  vd.applyToMesh(m);
+  var mat = new BABYLON.StandardMaterial('skymat', bscene);
+  mat.disableLighting = true;
+  mat.emissiveColor = new BABYLON.Color3(1, 1, 1);
+  mat.diffuseColor = new BABYLON.Color3(0, 0, 0);
+  mat.fogEnabled = false;
+  mat.backFaceCulling = false;
+  m.material = mat;
+  m.useVertexColors = true;
+  m.infiniteDistance = true;
 })();
 
 /* ================= золотий карась удалині ================= */
@@ -724,21 +1095,31 @@ var bigKaras;
 
 /* далекі гори, щоб обрій не був порожній */
 (function(){
-  var g = new THREE.BufferGeometry();
-  var v = [], c = [];
+  var pos = [], idx = [], col = [], k = 0;
   for (var i = 0; i < 40; i++) {
     var a0 = i / 40 * Math.PI * 2, a1 = (i + 1) / 40 * Math.PI * 2;
     var R = 390, hgt = 52 + Math.sin(i * 2.3) * 30 + Math.cos(i * 0.9) * 20;
     var x0 = Math.cos(a0) * R, z0 = Math.sin(a0) * R;
     var x1 = Math.cos(a1) * R, z1 = Math.sin(a1) * R;
-    var mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
-    v.push(x0, -20, z0, x1, -20, z1, mx, hgt, mz);
-    for (var k = 0; k < 3; k++) c.push(0.10, 0.11, 0.14);
+    pos.push(x0, -20, z0, x1, -20, z1, (x0 + x1) / 2, hgt, (z0 + z1) / 2);
+    idx.push(k, k + 2, k + 1);
+    k += 3;
+    for (var c = 0; c < 3; c++) col.push(0.10, 0.11, 0.14, 1);
   }
-  g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(c, 3));
-  g.computeVertexNormals();
-  scene.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false })));
+  var nrm = [];
+  BABYLON.VertexData.ComputeNormals(pos, idx, nrm);
+  var m = new BABYLON.Mesh('mnt', bscene);
+  var vd = new BABYLON.VertexData();
+  vd.positions = pos; vd.indices = idx; vd.normals = nrm; vd.colors = col;
+  vd.applyToMesh(m);
+  var mat = new BABYLON.StandardMaterial('mntmat', bscene);
+  mat.disableLighting = true;
+  mat.emissiveColor = new BABYLON.Color3(1, 1, 1);
+  mat.diffuseColor = new BABYLON.Color3(0, 0, 0);
+  mat.fogEnabled = false;
+  mat.backFaceCulling = false;
+  m.material = mat;
+  m.useVertexColors = true;
 })();
 
 /* тло в сцені постійно; зона лише вмикає або гасить карася */
@@ -3056,6 +3437,10 @@ function animateWorld(dt){
 /* налагоджувальний гачок для перевірок */
 window.__K3 = { P: P, G: G, foes: foes, getBoss: function(){ return boss; }, keys: keys,
   look: function(p, y){ camPitch = p; if (y !== undefined) camYaw = y; },
+  hurtBoss: function(d){ hurtBoss(d); },
+  atk: function(h){ attack(h); },
+  hit: function(){ doHitCheck(); },
+  freezeBoss: function(){ var b = boss; b.st = 'idle'; b.t = -999; b.next = 999; },
   scene: scene, cam: camera, karasObj: function(){ return bigKaras; }, THREE: THREE,
   karas: function(){ var v = bigKaras.position.clone(); v.project(camera); return { x: v.x.toFixed(2), y: v.y.toFixed(2), z: v.z.toFixed(2) }; },
   tp: function(x, z){ P.x = x; P.z = z; P.y = hAt(x, z); } };
