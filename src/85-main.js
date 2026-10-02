@@ -176,7 +176,7 @@ function animateWorld(dt){
   }
   // тінь ходить за гравцем
   if (!LOWFX) {
-    sun.position.set(P.x - 34, P.y + 48, P.z - 40);
+    sun.position.set(P.x - 46, P.y + 26, P.z - 34);   // низько: довгі тіні
     sun.target.position.set(P.x, P.y, P.z);
     sun.target.updateMatrixWorld();
   }

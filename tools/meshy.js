@@ -12,11 +12,13 @@
   .glb у assets/chars/, і вже вони потрапляють у репозиторій.
 
   Запуск:
+      node tools/meshy.js --check           чи працює ключ і скільки кредитів
       node tools/meshy.js --list            що взагалі вміємо генерувати
-      node tools/meshy.js --dry             що буде зроблено, без витрат
-      node tools/meshy.js --only karas-head  одна деталь
+      node tools/meshy.js --dry             що буде зроблено й за скільки
+      node tools/meshy.js --only karas-head одна деталь
       node tools/meshy.js                   усе, чого ще нема
-      node tools/meshy.js --refine          ще й уточнення з текстурами (дорожче)
+      node tools/meshy.js --model meshy-6   дорожча й краща модель (20 замість 5)
+      node tools/meshy.js --refine          ще й текстури (+10) — нам не треба
 
   Уже завантажене не перегенеровується — повторний запуск нічого не коштує.
 */
@@ -30,51 +32,60 @@ const OUT = path.join(ROOT, 'assets', 'chars');
 const STATE = path.join(__dirname, 'tmp', 'meshy-tasks.json');
 const API = 'https://api.meshy.ai/openapi';
 
+/* ---------- стиль ----------
+   Решта гри — набори Kenney: низький полігонаж, пласкі заливки, грановані
+   поверхні, жодної фотореалістичної текстури. Тому замовляємо ТІЛЬКИ форму,
+   без текстур: колір накладається нашими ж матеріалами. Так деталі не
+   вилізають зі стилю, і коштує це вчетверо дешевше (5 кредитів замість 20
+   за меш плюс 10 за текстури). Наголос у запиті — на силует, не на поверхню. */
+const STYLE = ', low poly game asset, flat shaded, faceted hard edges, chunky ' +
+              'simplified shapes, clean readable silhouette, no surface detail, ' +
+              'no text, single connected object, untextured';
+
 /* ---------- деталі, які нам потрібні ----------
    Генеруємо саме ЧАСТИНИ, а не цілих персонажів: скелет і вся анімація бою
    в грі вже свої й працюють, а автоскелет від генератора — як пощастить.
    Частини просто вішаються на наявні суглоби. */
 const PARTS = {
   'karas-head': {
-    prompt: 'stylized low poly head of a crucian carp fish with a bald human-like ' +
-            'scalp on top, large round fish eyes on the sides, wide fish lips, two ' +
-            'short whiskers, three single hairs on the bald spot, olive green and ' +
-            'pale gold, flat untextured facing forward, game character part, ' +
-            'neck opening at the bottom',
-    poly: 3000
+    prompt: 'head of a cartoon crucian carp fish-man with a bald round human scalp ' +
+            'on top, big round fish eyes on the sides, thick wide fish lips, two ' +
+            'short whiskers, flat open neck stump at the bottom' + STYLE,
+    poly: 1600
   },
   'karas-torso': {
-    prompt: 'stylized low poly torso of an upright fish-man, elongated crucian carp ' +
-            'body with golden scales, pale belly, small dorsal fin on the back, ' +
-            'no head, no arms, no legs, openings at neck shoulders and hips, ' +
-            'game character part',
-    poly: 3500
+    prompt: 'torso of an upright cartoon fish-man, rounded carp body with a small ' +
+            'dorsal fin on the back, no head, no arms, no legs, flat open stumps at ' +
+            'the neck, both shoulders and the hips' + STYLE,
+    poly: 1800
   },
   'karas-fin': {
-    prompt: 'stylized low poly fish fin, orange translucent membrane with bone rays, ' +
-            'fan shaped, game asset part, flat colors',
-    poly: 800
+    prompt: 'single fan shaped fish fin with thick bone rays, slightly curved, ' +
+            'flat stump at the base' + STYLE,
+    poly: 500
   },
   'foe-head': {
-    prompt: 'stylized low poly head of a rotten undead carp fish, sunken milky eyes, ' +
-            'torn gills, slimy dark green and swamp brown, open jaw with small teeth, ' +
-            'game character part, neck opening at the bottom',
-    poly: 3000
+    prompt: 'head of a cartoon undead rotten carp fish-man, sunken hollow eyes, torn ' +
+            'ragged gills, open jaw with a few blunt teeth, flat open neck stump at ' +
+            'the bottom' + STYLE,
+    poly: 1600
   },
   'foe-torso': {
-    prompt: 'stylized low poly torso of an upright undead fish-man, rotten carp body, ' +
-            'dark swamp green scales, torn pale belly, no head no arms no legs, ' +
-            'openings at neck shoulders and hips, game character part',
-    poly: 3500
+    prompt: 'torso of an upright cartoon undead fish-man, gaunt ribbed carp body with ' +
+            'torn flesh, no head, no arms, no legs, flat open stumps at the neck, ' +
+            'both shoulders and the hips' + STYLE,
+    poly: 1800
   },
   'boss-head': {
-    prompt: 'stylized low poly head of a huge menacing bream fish covered in river ' +
-            'silt, heavy jaw, glowing pale eyes, crown of broken bones and rusty ' +
-            'spikes on top, mossy green and muddy gold, game boss character part, ' +
-            'neck opening at the bottom',
-    poly: 5000
+    prompt: 'head of a huge menacing cartoon bream fish, heavy blunt jaw, deep set ' +
+            'eyes, a crown of broken spikes around the skull, flat open neck stump ' +
+            'at the bottom' + STYLE,
+    poly: 2600
   }
 };
+
+/* 5 кредитів за меш на легкій моделі, 20 на meshy-6 */
+const MODELS = { 'meshy-6-lite': 5, 'meshy-6': 20, 'meshy-7.1': 20, latest: 20 };
 
 /* ---------- ключ ---------- */
 function readKey(){
@@ -183,9 +194,15 @@ function saveState(s){
   if (done.length) console.log('уже є: ' + done.join(', '));
   if (!todo.length) { console.log('генерувати нічого.'); return; }
 
+  const aiModel = val('--model') || 'meshy-6-lite';
+  if (!MODELS[aiModel]) { console.error('невідома модель: ' + aiModel); process.exit(2); }
+  const each = MODELS[aiModel] + (has('--refine') ? 10 : 0);
+
   if (has('--dry')) {
     console.log('буде згенеровано ' + todo.length + ': ' + todo.join(', '));
-    console.log('режим: ' + (has('--refine') ? 'чернетка + уточнення з текстурами' : 'лише чернетка'));
+    console.log('модель: ' + aiModel + ', режим: ' +
+      (has('--refine') ? 'меш + текстури' : 'лише меш (текстури нам не потрібні)'));
+    console.log('ціна: ' + each + ' кредитів за деталь, разом ' + (each * todo.length));
     return;
   }
 
@@ -205,7 +222,7 @@ function saveState(s){
       const r = await call('POST', API + '/v2/text-to-3d', {
         mode: 'preview',
         prompt: p.prompt,
-        ai_model: 'meshy-6',
+        ai_model: aiModel,
         topology: 'triangle',
         target_polycount: p.poly,
         should_remesh: true

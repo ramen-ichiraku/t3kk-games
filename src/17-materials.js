@@ -21,9 +21,9 @@ var M = {
 };
 
 /* поверхні перестають бути пластиковими: текстура лише модулює колір */
-skin(M.stone,  'rough',  { vary: 0.42, seed: 11, bump: 3.0 }, 3);
-skin(M.stoneD, 'roughD', { vary: 0.40, seed: 23, bump: 3.0 }, 3);
-skin(M.stoneL, 'roughL', { vary: 0.38, seed: 31, bump: 2.6 }, 2);
+skin(M.stone,  'rough',  { vary: 0.26, seed: 11, bump: 1.8, level: 0.45 }, 3);
+skin(M.stoneD, 'roughD', { vary: 0.22, seed: 23, bump: 1.4, level: 0.35 }, 3);
+skin(M.stoneL, 'roughL', { vary: 0.24, seed: 31, bump: 1.6, level: 0.4 }, 2);
 skin(M.wall,   'wall',   { vary: 0.34, seed: 41, bump: 2.4, warm: 0.10 }, 2);
 skin(M.wallD,  'wallD',  { vary: 0.32, seed: 43, bump: 2.4, warm: 0.10 }, 2);
 skin(M.wood,   'wood',   { vary: 0.46, seed: 53, streak: 7, bump: 3.2, warm: 0.14 }, 2);

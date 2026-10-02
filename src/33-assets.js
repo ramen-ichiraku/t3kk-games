@@ -1,4 +1,19 @@
-/* ================= будівник риболюда ================= */
+/* ================= будівник риболюда =================
+   Обведення вішаємо ТІЛЬКИ на персонажів. Воно дає їм вагу й робить ворога
+   видимим на тлі каміння, але кожен обведений меш малюється двічі — на
+   чотирьохстах каменюках це коштувало б удвічі дорожче задарма. */
+function outline(root, w){
+  if (LOWFX) return root;
+  root.traverse(function(o){
+    if (!o.isMesh || !o.getTotalVertices || !o.getTotalVertices()) return;
+    o.renderOutline = true;
+    o.outlineWidth = w;
+    o.outlineColor = new BABYLON.Color3(0.05, 0.04, 0.06);
+  });
+  return root;
+}
+
+
 function buildFish(cfg){
   var c = Object.assign({
     body: M.scale, belly: M.scaleD, fin: M.fin, skin: M.skin,
@@ -156,6 +171,7 @@ function buildFish(cfg){
   });
 
   g.userData.P = P;
+  outline(g, 0.03 * c.s);
   return g;
 }
 

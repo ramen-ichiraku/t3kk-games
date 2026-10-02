@@ -56,6 +56,14 @@ function loadModels(done){
       // ділить світло на пі, через що моделі світилися, як ліхтарі.
       var pm = one.material;
       if (pm && pm.getClassName && pm.getClassName() === 'PBRMaterial') {
+        // камінь Kenney холодно-синій і свариться з теплим обрієм — зсуваємо
+        // його в бік землі, щоб палітра лишалась вузькою
+        if (pm.albedoColor) {
+          pm.albedoColor = new BABYLON.Color3(
+            Math.min(1, pm.albedoColor.r * 1.10),
+            Math.min(1, pm.albedoColor.g * 1.02),
+            pm.albedoColor.b * 0.86);
+        }
         pm.directIntensity = 0.26;
         pm.environmentIntensity = 0;
         pm.metallic = 0;

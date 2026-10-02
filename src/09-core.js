@@ -31,15 +31,19 @@ document.body.insertBefore(renderer.domElement, document.getElementById('fade'))
 engine.resize();
 
 var scene = new THREE.Scene();
-var SKY = 0x1d2233, FOGC = 0x2a3044;
+// Палітра навмисно вузька: холодна тінь, теплий обрій, і більше нічого.
+// Градієнтний стиль живе з контрасту двох температур, а не з кількості барв.
+var SKY = 0x2b3350, FOGC = 0x4b4a60;
 scene.background = new THREE.Color(SKY);
-scene.fog = new THREE.Fog(FOGC, 18, 165);
+// туман починається близько й тягнеться далеко: це повітряна перспектива,
+// вона розділяє плани й дає відчуття простору задарма
+scene.fog = new THREE.Fog(FOGC, 34, 200);
 
 var camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 900);
 
-var hemi = new THREE.HemisphereLight(0x5b6a8e, 0x2f2a20, 0.62);
+var hemi = new THREE.HemisphereLight(0x7183b4, 0x4a3a2c, 0.78);
 scene.add(hemi);
-var sun = new THREE.DirectionalLight(0xffd2a0, 1.0);
+var sun = new THREE.DirectionalLight(0xffc07a, 1.25);
 sun.position.set(-40, 54, -70);
 if (!LOWFX) {
   sun.castShadow = true;
@@ -50,7 +54,7 @@ if (!LOWFX) {
 }
 scene.add(sun);
 scene.add(sun.target);
-var amb = new THREE.AmbientLight(0x2b3048, 0.26);
+var amb = new THREE.AmbientLight(0x3a4068, 0.30);
 scene.add(amb);
 
 /* ---- пост-обробка: найбільший стрибок у вигляді за найменші зусилля ---- */
@@ -68,23 +72,18 @@ scene.add(amb);
   var ip = pipe.imageProcessing;
   ip.toneMappingEnabled = true;
   ip.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
-  ip.exposure = 1.34;
-  ip.contrast = 1.10;
+  ip.exposure = 1.18;
+  ip.contrast = 1.16;
   ip.vignetteEnabled = true;
-  ip.vignetteWeight = 1.15;
+  ip.vignetteWeight = 1.05;
   ip.vignetteStretch = 0.4;
   ip.vignetteColor = new BABYLON.Color4(0.02, 0.02, 0.04, 1);
   ip.vignetteCameraFov = 1.1;
   if (!LOWFX) {
     pipe.sharpenEnabled = true;
-    pipe.sharpen.edgeAmount = 0.18;
-    // затінення у западинах: саме воно прибирає відчуття пластику
-    var ssao = new BABYLON.SSAO2RenderingPipeline('ssao', bscene, { ssaoRatio: 0.6, blurRatio: 1 }, [cam]);
-    ssao.totalStrength = 0.8;
-    ssao.radius = 1.6;
-    ssao.base = 0.12;
-    ssao.samples = 12;
-    ssao.maxZ = 90;
+    pipe.sharpen.edgeAmount = 0.12;
+    // SSAO тут не потрібен: у пласкому стилі він лише брудить стики,
+    // а коштував майже десяту частину кадру
   }
 })();
 

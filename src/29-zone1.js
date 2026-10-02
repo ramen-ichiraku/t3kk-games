@@ -9,7 +9,7 @@ ZONES.field = {
   road: ROAD,
   edge: EDGE,
   spawn: { x: CHAPEL.x, z: CHAPEL.z + 1.8, yaw: Math.PI },
-  sky: { bg: 0x1d2233, fog: 0x2a3044, near: 18, far: 165, sun: 1.0, amb: 0.26, hemi: 0.62 },
+  sky: { bg: 0x2b3350, fog: 0x4b4a60, near: 34, far: 200, sun: 1.25, amb: 0.30, hemi: 0.78 },
 
   h: function(x, z){
     var h = Math.sin(x * 0.052) * 1.2 + Math.cos(z * 0.045) * 1.0 + Math.sin((x + z) * 0.026) * 1.7;
@@ -66,7 +66,7 @@ ZONES.field = {
     root.add(buildTerrainMesh(ZONES.field.h, 340, 176, function(x, z){
       var t = Math.max(0, 1 - roadDist(x, z) / 4.2);
       var m = 0.78 + 0.42 * (Math.sin(x * 0.7) * Math.cos(z * 0.6) * 0.5 + 0.5);
-      return [(0.27 + t * 0.17) * m, (0.29 + t * 0.13) * m, (0.21 + t * 0.10) * m];
+      return [(0.44 + t * 0.26) * m, (0.42 + t * 0.17) * m, (0.26 + t * 0.10) * m];
     }));
   /* ================= каплиця ================= */
 

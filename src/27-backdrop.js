@@ -5,12 +5,13 @@
   var tex = new BABYLON.DynamicTexture('skytex', { width: 4, height: 256 }, bscene, false);
   var c = tex.getContext();
   var g = c.createLinearGradient(0, 0, 0, 256);
-  g.addColorStop(0.00, 'rgb(22,26,44)');
-  g.addColorStop(0.34, 'rgb(44,50,76)');
-  g.addColorStop(0.60, 'rgb(78,80,104)');
-  g.addColorStop(0.80, 'rgb(126,110,106)');
-  g.addColorStop(0.92, 'rgb(178,134,100)');
-  g.addColorStop(1.00, 'rgb(96,78,66)');
+  g.addColorStop(0.00, 'rgb(26,32,62)');
+  g.addColorStop(0.28, 'rgb(52,60,96)');
+  g.addColorStop(0.52, 'rgb(96,96,126)');
+  g.addColorStop(0.70, 'rgb(150,130,134)');
+  g.addColorStop(0.84, 'rgb(206,158,116)');
+  g.addColorStop(0.94, 'rgb(228,176,118)');
+  g.addColorStop(1.00, 'rgb(122,98,86)');
   c.fillStyle = g; c.fillRect(0, 0, 4, 256);
   tex.update();
   var m = BABYLON.MeshBuilder.CreateSphere('sky', { diameter: 1300, segments: 20, sideOrientation: BABYLON.Mesh.BACKSIDE }, bscene);
@@ -115,7 +116,7 @@ var bigKaras;
     pos.push(x0, -20, z0, x1, -20, z1, (x0 + x1) / 2, hgt, (z0 + z1) / 2);
     idx.push(k, k + 2, k + 1);
     k += 3;
-    for (var c = 0; c < 3; c++) col.push(0.10, 0.11, 0.14, 1);
+    for (var c = 0; c < 3; c++) col.push(0.30, 0.30, 0.37, 1);
   }
   var nrm = [];
   BABYLON.VertexData.ComputeNormals(pos, idx, nrm);
