@@ -31,15 +31,25 @@ function buildFish(cfg){
   var torso = new THREE.Group();
   hip.add(torso);
   P.torso = torso;
-  var body = new THREE.Mesh(new THREE.SphereGeometry(0.42 * c.s, 14, 11), c.body);
-  body.scale.set(0.86, 1.18, 0.7);
-  body.position.y = 0.16 * c.s;
-  body.castShadow = !LOWFX;
-  torso.add(body);
-  var belly = new THREE.Mesh(new THREE.SphereGeometry(0.33 * c.s, 12, 9), c.belly);
-  belly.scale.set(0.8, 0.95, 0.55);
-  belly.position.set(0, 0.06 * c.s, 0.12 * c.s);
-  torso.add(belly);
+  // Тулуб — ціла рибина, поставлена сторч: носом угору, хвостом униз.
+  // Саме така форма й потрібна риболюдові, тож модель іде без розрізу.
+  var body = model('karas-body', { s: 1.02 * c.s, shadow: false });
+  if (body) {
+    body.material = c.body;
+    body.rotation.set(-Math.PI / 2, 0, 0);
+    body.position.y = 0.17 * c.s;
+    torso.add(body);
+  } else {
+    body = new THREE.Mesh(new THREE.SphereGeometry(0.42 * c.s, 14, 11), c.body);
+    body.scale.set(0.86, 1.18, 0.7);
+    body.position.y = 0.16 * c.s;
+    body.castShadow = !LOWFX;
+    torso.add(body);
+    var belly = new THREE.Mesh(new THREE.SphereGeometry(0.33 * c.s, 12, 9), c.belly);
+    belly.scale.set(0.8, 0.95, 0.55);
+    belly.position.set(0, 0.06 * c.s, 0.12 * c.s);
+    torso.add(belly);
+  }
 
   // спинний плавець
   var dors = new THREE.Mesh(new THREE.ConeGeometry(0.2 * c.s, 0.5 * c.s, 3), c.fin);
@@ -64,25 +74,37 @@ function buildFish(cfg){
   head.position.y = 0.66 * c.s;
   torso.add(head);
   P.head = head;
-  var skull = new THREE.Mesh(new THREE.SphereGeometry(0.28 * c.s, 14, 11), c.body);
-  skull.scale.set(0.9, 0.92, 1.05);
-  skull.castShadow = !LOWFX;
-  head.add(skull);
-  // морда й губи
-  var snout = new THREE.Mesh(new THREE.SphereGeometry(0.15 * c.s, 10, 8), c.body);
-  snout.position.set(0, -0.04 * c.s, 0.26 * c.s);
-  head.add(snout);
-  var lips = new THREE.Mesh(new THREE.TorusGeometry(0.085 * c.s, 0.045 * c.s, 6, 10), c.fin);
-  lips.position.set(0, -0.05 * c.s, 0.37 * c.s);
-  head.add(lips);
+  // Голова — передня частина риби, відрізана в завантажувачі. Генератор
+  // саму голову робити відмовляється, тож ріжемо вже тут, у себе.
+  var skull = model('karas-head', { s: 0.8 * c.s, shadow: false });
+  var skullIsModel = !!skull;
+  if (skull) {
+    skull.material = c.body;
+    skull.position.z = 0.06 * c.s;
+    head.add(skull);
+  } else {
+    skull = new THREE.Mesh(new THREE.SphereGeometry(0.28 * c.s, 14, 11), c.body);
+    skull.scale.set(0.9, 0.92, 1.05);
+    skull.castShadow = !LOWFX;
+    head.add(skull);
+    var snout = new THREE.Mesh(new THREE.SphereGeometry(0.15 * c.s, 10, 8), c.body);
+    snout.position.set(0, -0.04 * c.s, 0.26 * c.s);
+    head.add(snout);
+    var lips = new THREE.Mesh(new THREE.TorusGeometry(0.085 * c.s, 0.045 * c.s, 6, 10), c.fin);
+    lips.position.set(0, -0.05 * c.s, 0.37 * c.s);
+    head.add(lips);
+  }
   // очі
+  // Очі лишаємо навіть при згенерованій голові: виліплені очні ями без
+  // текстури за п'ять метрів не видно, а біла пляма з чорною зіницею читається.
+  var eyeOut = skullIsModel ? 0.235 : 0.19, eyeR = skullIsModel ? 0.062 : 0.075;
   [-1, 1].forEach(function(s){
-    var w = new THREE.Mesh(new THREE.SphereGeometry(0.075 * c.s, 8, 7), M.skin);
+    var w = new THREE.Mesh(new THREE.SphereGeometry(eyeR * c.s, 8, 7), M.skin);
     w.material = new THREE.MeshLambertMaterial({ color: 0xf2ece0 });
-    w.position.set(s * 0.19 * c.s, 0.04 * c.s, 0.17 * c.s);
+    w.position.set(s * eyeOut * c.s, 0.05 * c.s, 0.1 * c.s);
     head.add(w);
-    var p = new THREE.Mesh(new THREE.SphereGeometry(0.042 * c.s, 7, 6), new THREE.MeshBasicMaterial({ color: c.eye }));
-    p.position.set(s * 0.22 * c.s, 0.04 * c.s, 0.21 * c.s);
+    var p = new THREE.Mesh(new THREE.SphereGeometry(eyeR * 0.56 * c.s, 7, 6), new THREE.MeshBasicMaterial({ color: c.eye }));
+    p.position.set(s * (eyeOut + 0.03) * c.s, 0.05 * c.s, 0.13 * c.s);
     head.add(p);
   });
   // зябра

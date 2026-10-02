@@ -47,39 +47,42 @@ const STYLE = ', low poly game asset, flat shaded, faceted hard edges, chunky ' 
    в грі вже свої й працюють, а автоскелет від генератора — як пощастить.
    Частини просто вішаються на наявні суглоби. */
 const PARTS = {
+  /* Генератор навчений на цілих предметах і вперто ліпить цілу істоту: на
+     запит «голова з обрубком шиї» він двічі видав усю рибу. Тому просимо не
+     «частину», а те, що існує в житті окремим предметом — голову-трофей на
+     дощечці: вона за визначенням обрізана ззаду рівно. */
   'karas-head': {
-    prompt: 'head of a cartoon crucian carp fish-man with a bald round human scalp ' +
-            'on top, big round fish eyes on the sides, thick wide fish lips, two ' +
-            'short whiskers, flat open neck stump at the bottom' + STYLE,
+    prompt: 'mounted fish head wall trophy of a cartoon crucian carp with a bald ' +
+            'round human scalp on top, big round eyes on the sides, thick wide lips, ' +
+            'two short whiskers, cut off flat at the back of the neck, mounted on a ' +
+            'flat wooden plaque, no body, no tail, no fins' + STYLE,
     poly: 1600
   },
-  'karas-torso': {
-    prompt: 'torso of an upright cartoon fish-man, rounded carp body with a small ' +
-            'dorsal fin on the back, no head, no arms, no legs, flat open stumps at ' +
-            'the neck, both shoulders and the hips' + STYLE,
-    poly: 1800
+  /* Ціла рибина — саме та форма, що потрібна нам як тулуб риболюда. */
+  'karas-body': {
+    prompt: 'plump round cartoon crucian carp fish, no head, body only, small fins, ' +
+            'short tail' + STYLE,
+    poly: 1600
   },
   'karas-fin': {
     prompt: 'single fan shaped fish fin with thick bone rays, slightly curved, ' +
-            'flat stump at the base' + STYLE,
+            'standing upright on a flat base' + STYLE,
     poly: 500
   },
   'foe-head': {
-    prompt: 'head of a cartoon undead rotten carp fish-man, sunken hollow eyes, torn ' +
-            'ragged gills, open jaw with a few blunt teeth, flat open neck stump at ' +
-            'the bottom' + STYLE,
+    prompt: 'mounted fish head wall trophy of a rotten undead carp, sunken hollow ' +
+            'eyes, torn ragged gills, open jaw with blunt teeth, cut off flat at the ' +
+            'back of the neck, mounted on a flat wooden plaque, no body, no tail' + STYLE,
     poly: 1600
   },
-  'foe-torso': {
-    prompt: 'torso of an upright cartoon undead fish-man, gaunt ribbed carp body with ' +
-            'torn flesh, no head, no arms, no legs, flat open stumps at the neck, ' +
-            'both shoulders and the hips' + STYLE,
-    poly: 1800
+  'foe-body': {
+    prompt: 'gaunt ribbed rotten carp fish with torn flesh, no head, body only' + STYLE,
+    poly: 1600
   },
   'boss-head': {
-    prompt: 'head of a huge menacing cartoon bream fish, heavy blunt jaw, deep set ' +
-            'eyes, a crown of broken spikes around the skull, flat open neck stump ' +
-            'at the bottom' + STYLE,
+    prompt: 'mounted fish head wall trophy of a huge menacing bream, heavy blunt jaw, ' +
+            'deep set eyes, a crown of broken spikes around the skull, cut off flat at ' +
+            'the back of the neck, mounted on a flat wooden plaque, no body, no tail' + STYLE,
     poly: 2600
   }
 };

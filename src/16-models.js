@@ -18,6 +18,23 @@ var MODEL_DIR = {
   'tn': ['house-wall', 'house-door', 'house-window', 'house-broken', 'roof', 'roof-gable', 'roof-left', 'roof-right', 'cart', 'stall', 'well-stairs', 'town-lantern']
 };
 
+/* Згенеровані деталі персонажів. Лежать окремо: у них нема спільної
+   текстури, і правила до них інші — їх ріжемо й робимо гранованими. */
+MODEL_DIR['chars'] = ['karas-head', 'karas-body'];
+
+/* Генератор 3D навчений на цілих предметах і вперто ліпить цілу істоту:
+   на три різні формулювання «голова з обрубком шиї» він тричі видав усю рибу.
+   Тому беремо ціле й ріжемо самі — безкоштовно, точно й повторювано.
+
+   keep(x, y, z) дістає координати центра трикутника, зведені до нуля-одиниці
+   по габариту меша. flat — зробити гранованим: генератор згладжує нормалі, а
+   нам потрібні грані, як у решти світу. */
+var FIT = {
+  'karas-head': { keep: function(x, y, z){ return y > 0.34 && z > 0.42; },
+                  flat: true, norm: true, clone: true },
+  'karas-body': { flat: true, norm: true, clone: true }
+};
+
 var MODEL_IDS = [];
 var MODEL_OF = {};
 for (var __d in MODEL_DIR) if (MODEL_DIR.hasOwnProperty(__d))
@@ -43,6 +60,10 @@ function loadModels(done){
       var one = parts.length === 1 ? parts[0]
         : BABYLON.Mesh.MergeMeshes(parts, true, true, undefined, false, true);
       if (!one) { parts.forEach(function(m){ m.dispose(); }); return tick(); }
+      var fit = FIT[id];
+      if (fit && fit.keep) cutMesh(one, fit.keep);
+      if (fit && fit.norm) normMesh(one);
+      if (fit && fit.flat) one.convertToFlatShadedMesh();
       one.name = 'mdl:' + id;
       one.setParent(null);
       one.position.set(0, 0, 0);
@@ -82,6 +103,64 @@ function loadModels(done){
   });
 }
 
+/* Лишає тільки ті трикутники, центр яких проходить перевірку, і ущільнює
+   вершини. Без ущільнення габарит меша лишався б від цілої риби, і весь
+   подальший масштаб поплив би. */
+function cutMesh(m, keep){
+  var pos = m.getVerticesData('position'), idx = m.getIndices();
+  if (!pos || !idx) return m;
+  var nrm = m.getVerticesData('normal'), uv = m.getVerticesData('uv');
+  var bb = m.getBoundingInfo().boundingBox, mn = bb.minimum, mx = bb.maximum;
+  var dx = (mx.x - mn.x) || 1, dy = (mx.y - mn.y) || 1, dz = (mx.z - mn.z) || 1;
+  var map = new Int32Array(pos.length / 3);
+  for (var z0 = 0; z0 < map.length; z0++) map[z0] = -1;
+  var np = [], nn = [], nu = [], ni = [];
+  function push(v){
+    if (map[v] >= 0) return map[v];
+    var o = np.length / 3;
+    np.push(pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]);
+    if (nrm) nn.push(nrm[v * 3], nrm[v * 3 + 1], nrm[v * 3 + 2]);
+    if (uv) nu.push(uv[v * 2], uv[v * 2 + 1]);
+    map[v] = o;
+    return o;
+  }
+  for (var i = 0; i < idx.length; i += 3) {
+    var a0 = idx[i], b0 = idx[i + 1], c0 = idx[i + 2];
+    var cx = (pos[a0 * 3] + pos[b0 * 3] + pos[c0 * 3]) / 3;
+    var cy = (pos[a0 * 3 + 1] + pos[b0 * 3 + 1] + pos[c0 * 3 + 1]) / 3;
+    var cz = (pos[a0 * 3 + 2] + pos[b0 * 3 + 2] + pos[c0 * 3 + 2]) / 3;
+    if (!keep((cx - mn.x) / dx, (cy - mn.y) / dy, (cz - mn.z) / dz)) continue;
+    ni.push(push(a0), push(b0), push(c0));
+  }
+  if (!ni.length) return m;
+  var vd = new BABYLON.VertexData();
+  vd.positions = np; vd.indices = ni;
+  if (nrm) vd.normals = nn;
+  if (uv) vd.uvs = nu;
+  vd.applyToMesh(m);
+  return m;
+}
+
+/* Зводить меш до одиничного габариту з центром у нулі — тоді масштаб у
+   виклику model() означає розмір у метрах, і він не поповзе, якщо деталь
+   колись перегенерувати. */
+function normMesh(m){
+  var pos = m.getVerticesData('position');
+  if (!pos) return m;
+  m.refreshBoundingInfo();
+  var bb = m.getBoundingInfo().boundingBox, mn = bb.minimum, mx = bb.maximum;
+  var k = 1 / Math.max(mx.x - mn.x, mx.y - mn.y, mx.z - mn.z, 0.0001);
+  var cx = (mn.x + mx.x) / 2, cy = (mn.y + mx.y) / 2, cz = (mn.z + mx.z) / 2;
+  for (var i = 0; i < pos.length; i += 3) {
+    pos[i] = (pos[i] - cx) * k;
+    pos[i + 1] = (pos[i + 1] - cy) * k;
+    pos[i + 2] = (pos[i + 2] - cz) * k;
+  }
+  m.setVerticesData('position', pos);
+  m.refreshBoundingInfo();
+  return m;
+}
+
 function hasModel(id){ return !!MDL[id]; }
 
 /* Обведення на реквізиті: саме контур дає тій стилістиці, що в Wind Waker чи
@@ -101,7 +180,13 @@ function model(id, opt){
   var t = MDL[id];
   if (!t) return null;
   var o = opt || {};
-  var inst = t.createInstance('i' + (++__mdlN) + ':' + id);
+  var fit = FIT[id];
+  // Екземпляр не може мати власного матеріалу — усі ділять матеріал зразка.
+  // Персонажам потрібні різні кольори, тож для них робимо копію. Їх мало.
+  var inst = (fit && fit.clone)
+    ? t.clone('c' + (++__mdlN) + ':' + id)
+    : t.createInstance('i' + (++__mdlN) + ':' + id);
+  if (fit && fit.clone) inst.setEnabled(true);
   inst.isPickable = false;
   var s = o.s === undefined ? 1 : o.s;
   inst.scaling.set(s, s, s);
