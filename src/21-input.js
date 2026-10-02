@@ -1,4 +1,14 @@
 /* ================= ввід ================= */
+/* Браузер дає захопити мишу лише у відповідь на справжній клік. При
+   автозапуску з локального стенда виклик падає — ловимо, щоб не сипало
+   помилкою: гравець усе одно натисне й захопить сам. */
+function grabMouse(){
+  if (!cvs.requestPointerLock) return;
+  try {
+    var r = cvs.requestPointerLock();
+    if (r && r.catch) r.catch(function(){});
+  } catch (e) {}
+}
 var keys = {};
 function tok(e){
   var c = e.code;
@@ -31,7 +41,7 @@ var mouse = { dx:0, dy:0, locked:false, lmb:false, rmb:false };
 var cvs = renderer.domElement;
 cvs.addEventListener('mousedown', function(e){
   if (G.mode !== 'play') return;
-  if (!mouse.locked && cvs.requestPointerLock) { cvs.requestPointerLock(); return; }
+  if (!mouse.locked && cvs.requestPointerLock) { grabMouse(); return; }
   if (e.button === 0) { mouse.lmb = true; attack(!!keys.ShiftLeft); }
   if (e.button === 1) { toggleLock(); e.preventDefault(); }
   if (e.button === 2) mouse.rmb = true;

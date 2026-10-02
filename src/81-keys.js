@@ -19,7 +19,7 @@ document.getElementById('bGo').addEventListener('click', function(){
   G.mode = 'play';
   aInit(); musicStart();
   showArea('Каплиця Пробудження');
-  if (cvs.requestPointerLock) cvs.requestPointerLock();
+  grabMouse();
   syncUI();
 });
 document.getElementById('bRest').addEventListener('click', restAtFire);
