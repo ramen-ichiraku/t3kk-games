@@ -167,11 +167,11 @@ function posePlayer(dt, speed, il){
   if (P.roll > 0) {
     var rk = P.roll / 0.52;
     PP.hip.rotation.x = rk * Math.PI * 2;
-    PP.hip.position.y = 0.92 * 1.05 - Math.sin(rk * Math.PI) * 0.34;
+    PP.hip.position.y = (PP.hipY || 0.92 * 1.05) - Math.sin(rk * Math.PI) * 0.34;
     player.position.y = P.y;
   } else {
     PP.hip.rotation.x += (0 - PP.hip.rotation.x) * Math.min(1, dt * 12);
-    PP.hip.position.y += (0.92 * 1.05 - PP.hip.position.y) * Math.min(1, dt * 10);
+    PP.hip.position.y += ((PP.hipY || 0.92 * 1.05) - PP.hip.position.y) * Math.min(1, dt * 10);
   }
 
   var sw = Math.sin(t) * moving;

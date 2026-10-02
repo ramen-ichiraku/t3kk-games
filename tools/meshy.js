@@ -47,6 +47,20 @@ const STYLE = ', low poly game asset, flat shaded, faceted hard edges, chunky ' 
    в грі вже свої й працюють, а автоскелет від генератора — як пощастить.
    Частини просто вішаються на наявні суглоби. */
 const PARTS = {
+  /* Ціла фігура в Т-позі. Два шматки, замовлені нарізно, не складаються в
+     персонажа — між ними нема ні плечей, ні талії. Ціла фігура задумана як
+     одне, а на кінцівки ми ріжемо її самі: у Т-позі руки лежать уздовж осі X,
+     ноги йдуть униз, тож площини розрізу очевидні. */
+  'karas-hero': {
+    prompt: 'gaunt tall humanoid fish-man warrior standing in T-pose, arms straight ' +
+            'out to the sides, legs straight down, head of a crucian carp with a ' +
+            'bald round human scalp on top, big round fish eyes, thick lips, broad ' +
+            'bony shoulders, narrow waist, ribbed scaly chest, torn rag kilt around ' +
+            'the hips, thin sinewy arms and legs, bare webbed feet, grim and weary' + STYLE,
+    poly: 2400,
+    pose: 't-pose'
+  },
+
   /* Генератор навчений на цілих предметах і вперто ліпить цілу істоту: на
      запит «голова з обрубком шиї» він двічі видав усю рибу. Тому просимо не
      «частину», а те, що існує в житті окремим предметом — голову-трофей на
@@ -228,7 +242,8 @@ function saveState(s){
         ai_model: aiModel,
         topology: 'triangle',
         target_polycount: p.poly,
-        should_remesh: true
+        should_remesh: true,
+        pose_mode: p.pose || ''
       }, key);
       prev = r.result;
       state[id] = Object.assign(state[id] || {}, { preview: prev });

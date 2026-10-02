@@ -1,20 +1,26 @@
 /* ================= гравець ================= */
-var player = buildFish({ s: 1.05, body: M.scale, belly: M.scaleD, fin: M.fin, skin: M.skin, hairs: 3 });
-scene.add(player);
-var PP = player.userData.P;
-var PMATS = [];
-player.traverse(function(o){
-  if (o.isMesh && o.material) {
-    o.material = o.material.clone();
-    if (PMATS.indexOf(o.material) < 0) PMATS.push(o.material);
-  }
-});
-var sword = buildSword(1.05);
-PP.arms[1].hand.add(sword);
-// Лезо росте вздовж +Y від руків'я, а долоня дивиться вниз по -Y. Поворот на
-// +90 градусів навколо X кладе лезо вздовж +Z, тобто вперед — туди ж, куди
-// дивиться герой. Зі знаком мінус лезо дивилось рівно назад.
-sword.rotation.set(Math.PI / 2, 0, 0.16);
+/* Герой збирається не тут, а після того, як прийдуть моделі: цей файл
+   виконується на завантаженні скрипта, і раніше гравець устигав зібратись із
+   примітивів, поки вороги вже отримували згенеровану фігуру. */
+var player, PP, PMATS = [], sword;
+function initPlayer(){
+  player = buildFish({ s: 1.05, body: M.scale, belly: M.scaleD, fin: M.fin, skin: M.skin, hairs: 3 });
+  scene.add(player);
+  PP = player.userData.P;
+  PMATS.length = 0;
+  player.traverse(function(o){
+    if (o.isMesh && o.material) {
+      o.material = o.material.clone();
+      if (PMATS.indexOf(o.material) < 0) PMATS.push(o.material);
+    }
+  });
+  sword = buildSword(1.05);
+  PP.arms[1].hand.add(sword);
+  // Лезо росте вздовж +Y від руків'я, а долоня дивиться вниз по -Y. Поворот на
+  // +90 градусів навколо X кладе лезо вздовж +Z, тобто вперед — туди ж, куди
+  // дивиться герой. Зі знаком мінус лезо дивилось рівно назад.
+  sword.rotation.set(Math.PI / 2, 0, 0.16);
+}
 
 var P = {
   x: CHAPEL.x, y: 0, z: CHAPEL.z + 1.8, vy: 0, yaw: Math.PI,

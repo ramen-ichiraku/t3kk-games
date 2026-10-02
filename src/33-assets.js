@@ -1,3 +1,121 @@
+/* ================= риболюд із розрізаної фігури =================
+   Складає героя з десяти частин, нарізаних у завантажувачі з однієї цілої
+   фігури. Ієрархія груп і поля P — ті самі, що в buildFish, тож уся анімація
+   бою працює без жодної правки.
+
+   Між суглобом і мешем стоїть окрема група зі сталим поворотом: фігура
+   приходить у Т-позі, руки стирчать убік, а анімація присвоює поворотам
+   суглобів абсолютні значення й затерла б будь-яку поправку в них самих. */
+function buildFishModel(c){
+  var F = MDL_FIG['karas-hero'];
+  if (!F) return null;
+  var S = 1.92 * c.s;                 // висота фігури в метрах
+  var wr = F.wr, A = F.anchor;
+  function ax(a){ return (A[a][0] - 0.5) * wr * S; }   // суглоб у метрах
+  function ay(a){ return A[a][1] * S; }
+
+  var g = new THREE.Group();
+  var P = {};
+
+  /* шматок у групу, зі зсувом так, щоб суглоб опинився в нулі групи */
+  function piece(name, grp, anchorName, mat){
+    var m = model('karas-hero:' + name, { s: 1, shadow: false });
+    if (!m) return null;
+    m.material = mat || c.body;
+    m.scaling.set(S, S, S);
+    m.position.set(-ax(anchorName), -ay(anchorName), 0);
+    grp.add(m);
+    return m;
+  }
+  /* проміжна група зі сталим поворотом — щоб анімація його не затирала */
+  function rest(parent, rz){
+    var r = new THREE.Group();
+    r.rotation.z = rz;
+    parent.add(r);
+    return r;
+  }
+
+  var hip = new THREE.Group();
+  hip.position.y = ay('hipL');
+  g.add(hip);
+  P.hip = hip;
+
+  var torso = new THREE.Group();
+  hip.add(torso);
+  P.torso = torso;
+  piece('torso', torso, 'hipL');
+
+  var head = new THREE.Group();
+  head.position.y = ay('neck') - ay('hipL');
+  torso.add(head);
+  P.head = head;
+  piece('head', head, 'neck');
+
+  // хвіст лишаємо власний: у фігурі він частина тулуба, а анімація ним крутить
+  var tail = new THREE.Group();
+  tail.position.set(0, -0.1 * c.s, -0.26 * c.s);
+  torso.add(tail);
+  P.tail = tail;
+
+  // лисина й волосини — наші, це риса персонажа, а не риби
+  P.hairs = [];
+  if (c.bald) {
+    for (var h = 0; h < c.hairs; h++) {
+      var hr = new THREE.Mesh(new THREE.CylinderGeometry(0.005 * c.s, 0.008 * c.s, 0.1 * c.s, 4), M.dark);
+      hr.position.set((h - 1) * 0.035 * c.s, (ay('neck') - ay('hipL')) * 0.42 + 0.12 * c.s, -0.01 * c.s);
+      head.add(hr);
+      P.hairs.push(hr);
+    }
+  }
+
+  /* руки: 0 — ліва (-X), 1 — права (+X), меч іде в праву */
+  P.arms = [];
+  [['L', -1], ['R', 1]].forEach(function(d){
+    var side = d[0], sg = d[1];
+    var sh = new THREE.Group();
+    sh.position.set(ax('sh' + side), ay('sh' + side) - ay('hipL'), 0);
+    torso.add(sh);
+    // У Т-позі рука йде вздовж ±X; опускаємо її вниз сталим поворотом.
+    // Знак саме такий: ліва рука тягнеться в -X, і щоб вона лягла в -Y,
+    // поворот навколо Z має бути додатним, а для правої — від'ємним.
+    var shR = rest(sh, -sg * Math.PI / 2);
+    piece('arm' + side, shR, 'sh' + side);
+
+    var el = new THREE.Group();
+    el.position.y = -Math.abs(ax('el' + side) - ax('sh' + side));
+    sh.add(el);
+    var elR = rest(el, -sg * Math.PI / 2);
+    piece('fore' + side, elR, 'el' + side);
+
+    var hand = new THREE.Group();
+    hand.position.y = -Math.abs(ax('el' + side) - ax('sh' + side)) * 0.9;
+    el.add(hand);
+    P.arms.push({ sh: sh, el: el, hand: hand, s: sg });
+  });
+
+  /* ноги */
+  P.legs = [];
+  [['L', -1], ['R', 1]].forEach(function(d){
+    var side = d[0], sg = d[1];
+    var hp = new THREE.Group();
+    hp.position.set(ax('hip' + side), 0, 0);
+    hip.add(hp);
+    piece('thigh' + side, hp, 'hip' + side);
+
+    var kn = new THREE.Group();
+    kn.position.y = ay('kn' + side) - ay('hip' + side);
+    hp.add(kn);
+    piece('shin' + side, kn, 'kn' + side);
+
+    P.legs.push({ hp: hp, kn: kn, s: sg });
+  });
+
+  P.hipY = ay('hipL');
+  g.userData.P = P;
+  outline(g, 0.03 * c.s);
+  return g;
+}
+
 /* ================= будівник риболюда =================
    Обведення вішаємо ТІЛЬКИ на персонажів. Воно дає їм вагу й робить ворога
    видимим на тлі каміння, але кожен обведений меш малюється двічі — на
@@ -15,10 +133,13 @@ function outline(root, w){
 
 
 function buildFish(cfg){
-  var c = Object.assign({
+  var c0 = Object.assign({
     body: M.scale, belly: M.scaleD, fin: M.fin, skin: M.skin,
     s: 1, bald: true, hairs: 3, eye: 0x1a1c22, crown: false
   }, cfg || {});
+  // ціла фігура є — складаємо з неї; нема — лишається саморобна
+  if (hasModel('karas-hero:torso')) { var mg = buildFishModel(c0); if (mg) return mg; }
+  var c = c0;
   var g = new THREE.Group();
   var P = {};
 

@@ -20,7 +20,7 @@ var MODEL_DIR = {
 
 /* Згенеровані деталі персонажів. Лежать окремо: у них нема спільної
    текстури, і правила до них інші — їх ріжемо й робимо гранованими. */
-MODEL_DIR['chars'] = ['karas-head', 'karas-body'];
+MODEL_DIR['chars'] = ['karas-head', 'karas-body', 'karas-hero'];
 
 /* Генератор 3D навчений на цілих предметах і вперто ліпить цілу істоту:
    на три різні формулювання «голова з обрубком шиї» він тричі видав усю рибу.
@@ -29,6 +29,44 @@ MODEL_DIR['chars'] = ['karas-head', 'karas-body'];
    keep(x, y, z) дістає координати центра трикутника, зведені до нуля-одиниці
    по габариту меша. flat — зробити гранованим: генератор згладжує нормалі, а
    нам потрібні грані, як у решти світу. */
+/* Герой приходить ЦІЛОЮ фігурою в Т-позі, і це принципово: два шматки,
+   замовлені нарізно, не складаються в персонажа — між ними нема ні плечей,
+   ні талії. Ціла фігура задумана як одне, а на кінцівки ріжемо її тут, по
+   суглобах. Усі частини з одного меша, тож пасують одна до одної.
+
+   Межі взяті не на око: гістограма зайнятості меша показала, що руки лежать
+   поза x 0.28..0.72 на висоті y 0.58..0.75, голова вище y 0.80, ноги нижче
+   y 0.30. Координати — частки габариту фігури. */
+/* Межі перекриваються: сусідні частини заходять одна в одну, інакше на
+   кожному суглобі зяяла б дірка, коли кінцівка повернеться. Для різаного
+   персонажа це звичайний прийом — шов ховається всередині тіла. */
+function __arm(x, y){ return (x < 0.30 || x > 0.70) && y > 0.50; }
+var FIGURE = {
+  'karas-hero': {
+    pieces: {
+      head:   function(x, y){ return y > 0.76; },
+      torso:  function(x, y){ return y > 0.27 && y <= 0.81 && !__arm(x, y); },
+      armL:   function(x, y){ return __arm(x, y) && x < 0.5 && x > 0.125; },
+      foreL:  function(x, y){ return __arm(x, y) && x <= 0.165; },
+      armR:   function(x, y){ return __arm(x, y) && x > 0.5 && x < 0.875; },
+      foreR:  function(x, y){ return __arm(x, y) && x >= 0.835; },
+      thighL: function(x, y){ return y <= 0.32 && y > 0.135 && x < 0.5; },
+      shinL:  function(x, y){ return y <= 0.175 && x < 0.5; },
+      thighR: function(x, y){ return y <= 0.32 && y > 0.135 && x >= 0.5; },
+      shinR:  function(x, y){ return y <= 0.175 && x >= 0.5; }
+    },
+    /* точки суглобів у тих самих частках габариту */
+    anchor: {
+      neck: [0.5, 0.795],
+      shL: [0.28, 0.665], elL: [0.145, 0.655],
+      shR: [0.72, 0.665], elR: [0.855, 0.655],
+      hipL: [0.44, 0.30], knL: [0.44, 0.155],
+      hipR: [0.56, 0.30], knR: [0.56, 0.155]
+    }
+  }
+};
+var MDL_FIG = {};        // id -> { wr, dr, anchor }: ширина й глибина у частках висоти
+
 var FIT = {
   'karas-head': { keep: function(x, y, z){ return y > 0.34 && z > 0.42; },
                   flat: true, norm: true, clone: true },
@@ -60,6 +98,7 @@ function loadModels(done){
       var one = parts.length === 1 ? parts[0]
         : BABYLON.Mesh.MergeMeshes(parts, true, true, undefined, false, true);
       if (!one) { parts.forEach(function(m){ m.dispose(); }); return tick(); }
+      if (FIGURE[id]) { splitFigure(id, one); MODELS_OK++; return tick(); }
       var fit = FIT[id];
       if (fit && fit.keep) cutMesh(one, fit.keep);
       if (fit && fit.norm) normMesh(one);
@@ -161,6 +200,48 @@ function normMesh(m){
   return m;
 }
 
+/* Ріже цілу фігуру на частини по суглобах і зводить усі їх в один простір:
+   висота дорівнює одиниці, ступні на нулі, центр по X і Z. Частини лишаються
+   на своїх місцях одна відносно одної — саме тому фігура й замовлялась цілою. */
+function splitFigure(id, one){
+  var F = FIGURE[id];
+  var bb = one.getBoundingInfo().boundingBox, mn = bb.minimum, mx = bb.maximum;
+  var H = (mx.y - mn.y) || 1;
+  var cx = (mn.x + mx.x) / 2, cz = (mn.z + mx.z) / 2;
+  MDL_FIG[id] = { wr: (mx.x - mn.x) / H, dr: (mx.z - mn.z) / H, anchor: F.anchor, h: H };
+
+  // clone() у Babylon ДІЛИТЬ геометрію, а не копіює: різали б уже відрізане
+  // і від фігури лишалось би казна-що. Тому кожній частині — власні вершини.
+  var src = BABYLON.VertexData.ExtractFromMesh(one);
+  for (var k in F.pieces) {
+    if (!F.pieces.hasOwnProperty(k)) continue;
+    var p = new BABYLON.Mesh(id + ':' + k, bscene);
+    var vd0 = new BABYLON.VertexData();
+    vd0.positions = src.positions.slice();
+    vd0.indices = src.indices.slice();
+    if (src.normals) vd0.normals = src.normals.slice();
+    if (src.uvs) vd0.uvs = src.uvs.slice();
+    vd0.applyToMesh(p);
+    p.material = one.material;
+    cutMesh(p, F.pieces[k]);                 // габарит копії ще від цілої фігури — так і треба
+    var pos = p.getVerticesData('position');
+    if (!pos || !pos.length) { p.dispose(); continue; }
+    for (var i = 0; i < pos.length; i += 3) {
+      pos[i] = (pos[i] - cx) / H;
+      pos[i + 1] = (pos[i + 1] - mn.y) / H;
+      pos[i + 2] = (pos[i + 2] - cz) / H;
+    }
+    p.setVerticesData('position', pos);
+    p.refreshBoundingInfo();
+    p.convertToFlatShadedMesh();
+    p.name = 'mdl:' + id + ':' + k;
+    p.setEnabled(false);
+    p.isPickable = false;
+    MDL[id + ':' + k] = p;
+  }
+  one.dispose();
+}
+
 function hasModel(id){ return !!MDL[id]; }
 
 /* Обведення на реквізиті: саме контур дає тій стилістиці, що в Wind Waker чи
@@ -180,7 +261,7 @@ function model(id, opt){
   var t = MDL[id];
   if (!t) return null;
   var o = opt || {};
-  var fit = FIT[id];
+  var fit = FIT[id] || (id.indexOf(':') > 0 ? { clone: true } : null);
   // Екземпляр не може мати власного матеріалу — усі ділять матеріал зразка.
   // Персонажам потрібні різні кольори, тож для них робимо копію. Їх мало.
   var inst = (fit && fit.clone)

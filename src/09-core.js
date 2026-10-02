@@ -64,7 +64,9 @@ scene.add(amb);
   pipe.samples = LOWFX ? 1 : 4;
   pipe.fxaaEnabled = !LOWFX;
   pipe.bloomEnabled = true;
-  pipe.bloomThreshold = 0.62;
+  // поріг високий навмисно: світитись має золотий Карась і вогонь,
+  // а не кожен персонаж у кадрі
+  pipe.bloomThreshold = 0.82;
   pipe.bloomWeight = 0.42;
   pipe.bloomKernel = 48;
   pipe.bloomScale = 0.5;

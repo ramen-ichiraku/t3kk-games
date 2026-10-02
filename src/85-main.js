@@ -9,6 +9,7 @@ var __bGoText = __bGo.textContent;
 __bGo.disabled = true;
 __bGo.textContent = 'Завантаження…';
 loadModels(function(){
+  initPlayer();
   loadZone('field');
   makeBoss();
   syncUI();
