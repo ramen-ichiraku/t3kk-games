@@ -234,6 +234,9 @@ if (typeof BABYLON === 'undefined') {
    протилежна — див. buildTerrainMesh і тло. */
 
 var LOWFX = /(\?|&)fx=low/.test(location.search);
+// fx=max — для знімків і замірів: не дає автоякості зрізати шари на повільному
+// програмному рендерері, де справжнього часу кадру все одно не дізнатись
+var FXMAX = /(\?|&)fx=max/.test(location.search);
 
 var __cv = document.createElement('canvas');
 __cv.id = 'cv';
@@ -245,7 +248,7 @@ bscene.ambientColor = new BABYLON.Color3(0, 0, 0);
 var shadowGen = null;
 /* Babylon реагує на світло інакше за Three: один спільний регулятор,
    щоб не правити інтенсивність у кожній лампі окремо */
-var GAIN = { point: 3.6, dir: 3.4, hemi: 3.4, amb: 3.2 };
+var GAIN = { point: 4.6, dir: 4.2, hemi: 4.2, amb: 4.0 };
 
 var __n = 0;
 function __nn(p){ return p + (++__n); }
@@ -393,16 +396,30 @@ function makeMat(o, basic){
   Object.defineProperty(m, 'opacity', { get: function(){ return m.alpha; }, set: function(v){ m.alpha = v; }, configurable: true });
   Object.defineProperty(m, 'transparent', { get: function(){ return m.alpha < 1; }, set: function(){}, configurable: true });
   m.clone0 = m.clone;
-  m.clone = function(){ var c = m.clone0(__nn('mat')); return decorateMat(c); };
+  m.clone = function(){ return decorateMat(reshareTex(m, m.clone0(__nn('mat')))); };
   return m;
 }
+/* Babylon клонує разом із матеріалом і його текстури, а копія DynamicTexture
+   виходить порожньою й ніколи не стає готовою — StandardMaterial через це
+   вважає меш неготовим і взагалі його не малює. Герой і вороги клонують
+   матеріали заради спалаху від удару, тож повертаємо спільні текстури назад. */
+var TEX_SLOTS = ['diffuseTexture', 'bumpTexture', 'emissiveTexture', 'specularTexture',
+                 'ambientTexture', 'opacityTexture', 'reflectionTexture'];
+function reshareTex(src, dst){
+  for (var i = 0; i < TEX_SLOTS.length; i++) {
+    var k = TEX_SLOTS[i];
+    if (src[k] && dst[k] !== src[k]) { if (dst[k]) dst[k].dispose(); dst[k] = src[k]; }
+  }
+  return dst;
+}
+
 function decorateMat(m){
   Object.defineProperty(m, 'emissive', { get: function(){ return m.emissiveColor; }, configurable: true });
   Object.defineProperty(m, 'opacity', { get: function(){ return m.alpha; }, set: function(v){ m.alpha = v; }, configurable: true });
   Object.defineProperty(m, 'transparent', { get: function(){ return m.alpha < 1; }, set: function(){}, configurable: true });
   if (!m.userData) m.userData = {};
   m.clone0 = m.clone0 || m.clone;
-  m.clone = function(){ return decorateMat(m.clone0(__nn('mat'))); };
+  m.clone = function(){ return decorateMat(reshareTex(m, m.clone0(__nn('mat')))); };
   return m;
 }
 
@@ -483,7 +500,20 @@ var THREE = {
     } };
     L.shadow = { mapSize: { set: function(){} }, camera: {}, bias: 0 };
     Object.defineProperty(L, 'castShadow', {
-      set: function(v){ if (v && !shadowGen) { shadowGen = new BABYLON.ShadowGenerator(LOWFX ? 512 : 1024, L); shadowGen.useExponentialShadowMap = true; shadowGen.darkness = 0.45; } },
+      set: function(v){ if (v && !shadowGen) {
+        // кадр тіні тримаємо малим і прив'язаним до гравця: автопідбір
+        // розтягував його на всі 340 одиниць карти, і текстури не вистачало —
+        // уся сцена вкривалась самозатіненням і ставала майже чорною
+        L.autoUpdateExtends = false;
+        L.orthoLeft = -30; L.orthoRight = 30; L.orthoTop = 30; L.orthoBottom = -30;
+        L.shadowMinZ = 1; L.shadowMaxZ = 160;
+        shadowGen = new BABYLON.ShadowGenerator(LOWFX ? 512 : 2048, L);
+        shadowGen.usePercentageCloserFiltering = true;
+        shadowGen.filteringQuality = BABYLON.ShadowGenerator.QUALITY_MEDIUM;
+        shadowGen.bias = 0.008;
+        shadowGen.normalBias = 0.02;
+        shadowGen.darkness = 0.38;
+      } },
       get: function(){ return !!shadowGen; }, configurable: true
     });
     return L;
@@ -591,20 +621,20 @@ renderer.shadowMap.enabled = !LOWFX;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.92;
+renderer.toneMappingExposure = 1.12;
 document.body.insertBefore(renderer.domElement, document.getElementById('fade'));
 engine.resize();
 
 var scene = new THREE.Scene();
-var SKY = 0x10131a, FOGC = 0x141821;
+var SKY = 0x1d2233, FOGC = 0x2a3044;
 scene.background = new THREE.Color(SKY);
-scene.fog = new THREE.Fog(FOGC, 14, 140);
+scene.fog = new THREE.Fog(FOGC, 18, 165);
 
 var camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 900);
 
-var hemi = new THREE.HemisphereLight(0x3d4760, 0x17140f, 0.34);
+var hemi = new THREE.HemisphereLight(0x5b6a8e, 0x2f2a20, 0.62);
 scene.add(hemi);
-var sun = new THREE.DirectionalLight(0xffc888, 0.62);
+var sun = new THREE.DirectionalLight(0xffd2a0, 1.0);
 sun.position.set(-40, 54, -70);
 if (!LOWFX) {
   sun.castShadow = true;
@@ -615,8 +645,43 @@ if (!LOWFX) {
 }
 scene.add(sun);
 scene.add(sun.target);
-var amb = new THREE.AmbientLight(0x232838, 0.2);
+var amb = new THREE.AmbientLight(0x2b3048, 0.26);
 scene.add(amb);
+
+/* ---- пост-обробка: найбільший стрибок у вигляді за найменші зусилля ---- */
+(function(){
+  var cam = camera.__b;
+  var pipe = new BABYLON.DefaultRenderingPipeline('look', true, bscene, [cam]);
+  pipe.samples = LOWFX ? 1 : 4;
+  pipe.fxaaEnabled = !LOWFX;
+  pipe.bloomEnabled = true;
+  pipe.bloomThreshold = 0.62;
+  pipe.bloomWeight = 0.42;
+  pipe.bloomKernel = 48;
+  pipe.bloomScale = 0.5;
+  pipe.imageProcessingEnabled = true;
+  var ip = pipe.imageProcessing;
+  ip.toneMappingEnabled = true;
+  ip.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
+  ip.exposure = 1.34;
+  ip.contrast = 1.10;
+  ip.vignetteEnabled = true;
+  ip.vignetteWeight = 1.15;
+  ip.vignetteStretch = 0.4;
+  ip.vignetteColor = new BABYLON.Color4(0.02, 0.02, 0.04, 1);
+  ip.vignetteCameraFov = 1.1;
+  if (!LOWFX) {
+    pipe.sharpenEnabled = true;
+    pipe.sharpen.edgeAmount = 0.18;
+    // затінення у западинах: саме воно прибирає відчуття пластику
+    var ssao = new BABYLON.SSAO2RenderingPipeline('ssao', bscene, { ssaoRatio: 0.6, blurRatio: 1 }, [cam]);
+    ssao.totalStrength = 0.8;
+    ssao.radius = 1.6;
+    ssao.base = 0.12;
+    ssao.samples = 12;
+    ssao.maxZ = 90;
+  }
+})();
 
 /* ================= менеджер зон =================
    Кожна зона — окремий опис: власний рельєф, власна забудова, власні вороги.
@@ -637,11 +702,12 @@ function zoneEdge(){ return (ZONE && ZONE.edge) || EDGE; }
 
 /* рельєф зони: один меш із забарвленням по висоті й дорозі */
 function buildTerrainMesh(hFn, size, seg, tint){
-  var pos = [], idx = [], col = [], n = seg + 1, step = size / seg;
+  var pos = [], idx = [], col = [], uvs = [], n = seg + 1, step = size / seg;
   for (var j = 0; j < n; j++) for (var i = 0; i < n; i++) {
     var x = -size / 2 + i * step, z = -size / 2 + j * step;
     var y = hFn(x, z);
     pos.push(x, y, z);
+    uvs.push(i / seg, j / seg);          // без них карта нормалей дає сміття
     var c = tint(x, z, y);
     col.push(c[0], c[1], c[2], 1);
   }
@@ -653,10 +719,19 @@ function buildTerrainMesh(hFn, size, seg, tint){
   BABYLON.VertexData.ComputeNormals(pos, idx, nrm);
   var m = new BABYLON.Mesh('terrain', bscene);
   var vd = new BABYLON.VertexData();
-  vd.positions = pos; vd.indices = idx; vd.normals = nrm; vd.colors = col;
+  vd.positions = pos; vd.indices = idx; vd.normals = nrm; vd.colors = col; vd.uvs = uvs;
   vd.applyToMesh(m);
   var mat = new BABYLON.StandardMaterial('terrmat', bscene);
   mat.specularColor = new BABYLON.Color3(0, 0, 0);
+  if (!LOWFX) {
+    var gt = makeTex('ground', { vary: 0.5, seed: 5, oct: 4, bump: 2.0, warm: 0.12 });
+    mat.diffuseTexture = gt.diffuse;
+    mat.bumpTexture = gt.bump;
+    mat.bumpTexture.level = 0.55;
+    var gs = size / 7;
+    mat.diffuseTexture.uScale = mat.diffuseTexture.vScale = gs;
+    mat.bumpTexture.uScale = mat.bumpTexture.vScale = gs;
+  }
   m.material = mat;
   m.useVertexColors = true;
   m.receiveShadows = !LOWFX;
@@ -802,6 +877,135 @@ function resolve(px, pz, rad){
   return [px, pz];
 }
 
+/* ================= процедурні текстури =================
+   Пласкі однотонні матеріали — головна причина, чому низькополігональна
+   графіка читається як заглушка. Шум, намальований у полотно, і карта
+   нормалей із того самого шуму знімають цю пласкість і не важать нічого.
+
+   Текстура тут — ДЕТАЛЬНА КАРТА: сірий шум навколо середнього TEX_MEAN.
+   Колір лишається в матеріалі. Якщо замість цього намалювати в текстурі
+   сам колір, Babylon помножить його на diffuseColor, тобто сам на себе,
+   і вся сцена потемніє вчетверо — на цьому вже один раз обпеклися. */
+
+var TEX_MEAN = 0.78;
+
+function __valNoise(w, seedN){
+  // згладжений шум, замкнений по краях, щоб текстура тайлилась
+  var g = [], i, j;
+  var s = seedN || 1;
+  function rr2(){ s = (s * 1664525 + 1013904223) % 4294967296; return s / 4294967296; }
+  var CELL = 8, n = Math.ceil(w / CELL) + 1;
+  var pts = [];
+  for (j = 0; j < n; j++) { pts[j] = []; for (i = 0; i < n; i++) pts[j][i] = rr2(); }
+  for (j = 0; j < n; j++) pts[j][n - 1] = pts[j][0];
+  for (i = 0; i < n; i++) pts[n - 1][i] = pts[0][i];
+  for (j = 0; j < w; j++) {
+    g[j] = [];
+    for (i = 0; i < w; i++) {
+      var fx = i / CELL, fy = j / CELL;
+      var x0 = Math.floor(fx), y0 = Math.floor(fy);
+      var tx = fx - x0, ty = fy - y0;
+      tx = tx * tx * (3 - 2 * tx); ty = ty * ty * (3 - 2 * ty);
+      var a = pts[y0][x0], b = pts[y0][x0 + 1], c = pts[y0 + 1][x0], d = pts[y0 + 1][x0 + 1];
+      g[j][i] = (a + (b - a) * tx) + ((c + (d - c) * tx) - (a + (b - a) * tx)) * ty;
+    }
+  }
+  return g;
+}
+
+/* висотне поле з кількох октав */
+function __height(w, seedN, oct){
+  var acc = [], k, j, i;
+  for (j = 0; j < w; j++) { acc[j] = []; for (i = 0; i < w; i++) acc[j][i] = 0; }
+  var amp = 1, tot = 0;
+  for (k = 0; k < (oct || 3); k++) {
+    var n = __valNoise(w, (seedN || 1) + k * 977);
+    var step = 1 << k;
+    for (j = 0; j < w; j++) for (i = 0; i < w; i++)
+      acc[j][i] += n[(j * step) % w][(i * step) % w] * amp;
+    tot += amp; amp *= 0.5;
+  }
+  for (j = 0; j < w; j++) for (i = 0; i < w; i++) acc[j][i] /= tot;
+  return acc;
+}
+
+var __texCache = {};
+/* повертає { diffuse, bump } — обидві тайлаються */
+function makeTex(name, opts){
+  if (__texCache[name]) return __texCache[name];
+  var o = opts || {};
+  var W = o.size || 128;
+  var H = __height(W, o.seed || 7, o.oct || 3);
+  var vary = o.vary === undefined ? 0.34 : o.vary;
+  var warm = o.warm || 0;       // легкий відхід у тепло-холод по плямах
+
+  var dt = new BABYLON.DynamicTexture(name + 'd', { width: W, height: W }, bscene, true);
+  var ctx = dt.getContext();
+  var img = ctx.createImageData(W, W);
+  var k = 0, i, j, v;
+  for (j = 0; j < W; j++) for (i = 0; i < W; i++) {
+    v = H[j][i];
+    // смугастість для дерева й лусочність для риби задаються через модифікатор
+    if (o.streak) v = v * 0.55 + 0.45 * (0.5 + 0.5 * Math.sin((i / W) * Math.PI * 2 * o.streak + v * 4));
+    if (o.scaleRows) {
+      var row = Math.floor(j / (W / o.scaleRows));
+      var off = (row % 2) * 0.5;
+      var u = ((i / W) * o.scaleRows + off) % 1;
+      v = v * 0.76 + 0.24 * (1 - Math.abs(u - 0.5) * 2);
+    }
+    var g0 = TEX_MEAN * (1 + (v - 0.5) * vary * 2);
+    var d = warm * (v - 0.5);
+    img.data[k++] = Math.max(0, Math.min(255, g0 * (1 + d) * 255));
+    img.data[k++] = Math.max(0, Math.min(255, g0 * 255));
+    img.data[k++] = Math.max(0, Math.min(255, g0 * (1 - d) * 255));
+    img.data[k++] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  dt.update();
+
+  // карта нормалей зі скінченних різниць того самого поля
+  var nt = new BABYLON.DynamicTexture(name + 'n', { width: W, height: W }, bscene, true);
+  var nc = nt.getContext();
+  var nimg = nc.createImageData(W, W);
+  var str = o.bump === undefined ? 2.4 : o.bump;
+  k = 0;
+  for (j = 0; j < W; j++) for (i = 0; i < W; i++) {
+    var hl = H[j][(i - 1 + W) % W], hr = H[j][(i + 1) % W];
+    var hu = H[(j - 1 + W) % W][i], hd = H[(j + 1) % W][i];
+    var nx = (hl - hr) * str, ny = (hu - hd) * str, nz = 1;
+    var len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+    nimg.data[k++] = (nx / len * 0.5 + 0.5) * 255;
+    nimg.data[k++] = (ny / len * 0.5 + 0.5) * 255;
+    nimg.data[k++] = (nz / len * 0.5 + 0.5) * 255;
+    nimg.data[k++] = 255;
+  }
+  nc.putImageData(nimg, 0, 0);
+  nt.update();
+
+  var res = { diffuse: dt, bump: nt };
+  __texCache[name] = res;
+  return res;
+}
+
+/* вішає детальну карту на матеріал і підіймає його колір на середнє
+   текстури, щоб загальна світлота поверхні не змінилась */
+function skin(mtl, texName, opts, uv){
+  if (LOWFX) return mtl;
+  var t = makeTex(texName, opts);
+  mtl.diffuseTexture = t.diffuse;
+  mtl.bumpTexture = t.bump;
+  mtl.bumpTexture.level = opts && opts.level !== undefined ? opts.level : 0.8;
+  var s = uv || 1;
+  mtl.diffuseTexture.uScale = mtl.diffuseTexture.vScale = s;
+  mtl.bumpTexture.uScale = mtl.bumpTexture.vScale = s;
+  var c = mtl.diffuseColor;
+  if (c) {
+    c.r = Math.min(1, c.r / TEX_MEAN);
+    c.g = Math.min(1, c.g / TEX_MEAN);
+    c.b = Math.min(1, c.b / TEX_MEAN);
+  }
+  return mtl;
+}
 /* ================= матеріали ================= */
 function mat(c, opt){
   var o = Object.assign({ color: c }, opt || {});
@@ -820,8 +1024,29 @@ var M = {
   wood:   mat(0x46392c), dark: mat(0x1b1d22),
   wall:   mat(0x6b6153), wallD: mat(0x4d463b),
   boss:   mat(0x6c6f4a), bossD: mat(0x3e4230), bossT: mat(0x8d7b3a, { emissive: 0x2b1f05 }),
-  ember:  mat(0xff7a2a, { emissive: 0xc23c05 })
+  ember:  mat(0xff7a2a, { emissive: 0xc23c05 }),
+  bone:   mat(0xb4ab92)
 };
+
+/* поверхні перестають бути пластиковими: текстура лише модулює колір */
+skin(M.stone,  'rough',  { vary: 0.42, seed: 11, bump: 3.0 }, 3);
+skin(M.stoneD, 'roughD', { vary: 0.40, seed: 23, bump: 3.0 }, 3);
+skin(M.stoneL, 'roughL', { vary: 0.38, seed: 31, bump: 2.6 }, 2);
+skin(M.wall,   'wall',   { vary: 0.34, seed: 41, bump: 2.4, warm: 0.10 }, 2);
+skin(M.wallD,  'wallD',  { vary: 0.32, seed: 43, bump: 2.4, warm: 0.10 }, 2);
+skin(M.wood,   'wood',   { vary: 0.46, seed: 53, streak: 7, bump: 3.2, warm: 0.14 }, 2);
+skin(M.scale,  'scales', { vary: 0.26, seed: 61, scaleRows: 9, bump: 2.0 }, 3.2);
+skin(M.scaleD, 'scalesD',{ vary: 0.26, seed: 67, scaleRows: 9, bump: 2.0 }, 3.2);
+skin(M.foeA,   'foeA',   { vary: 0.30, seed: 71, scaleRows: 7, bump: 2.2 }, 3.0);
+skin(M.foeB,   'foeB',   { vary: 0.30, seed: 73, scaleRows: 7, bump: 2.2 }, 3.0);
+skin(M.rust,   'rust',   { vary: 0.44, seed: 79, bump: 2.8, warm: 0.18 }, 2);
+skin(M.skin,   'hide',   { vary: 0.16, seed: 83, bump: 1.4 }, 1.2);
+skin(M.bread,  'crumb',  { vary: 0.40, seed: 89, oct: 4, bump: 3.4, warm: 0.12 }, 2);
+skin(M.crust,  'crust',  { vary: 0.42, seed: 97, oct: 4, bump: 3.4, warm: 0.16 }, 2);
+skin(M.bone,   'bone',   { vary: 0.30, seed: 109, bump: 2.2, warm: 0.08 }, 2);
+skin(M.cloth,  'cloth',  { vary: 0.26, seed: 101, streak: 14, bump: 1.8 }, 2);
+skin(M.boss,   'bossA',  { vary: 0.28, seed: 103, scaleRows: 8, bump: 2.4 }, 2.6);
+skin(M.bossD,  'bossD',  { vary: 0.28, seed: 107, scaleRows: 8, bump: 2.4 }, 2.6);
 
 SHARED_MATS = new Set();
 for (var mk in M) if (M.hasOwnProperty(mk)) SHARED_MATS.add(M[mk]);
@@ -985,37 +1210,35 @@ function setSound(on){
   else if (AB.master) AB.master.gain.value = 0;
 }
 
-/* ================= небо ================= */
+/* ================= небо =================
+   Кольори вершин у Babylon не діють на самосвітні матеріали,
+   тож градієнт малюємо в текстуру. */
 (function(){
-  var seg = 24, n = seg + 1, R = 520;
-  var pos = [], idx = [], col = [], nrm = [];
-  for (var j = 0; j < n; j++) for (var i = 0; i < n; i++) {
-    var u = i / seg * Math.PI * 2, v = j / seg * Math.PI;
-    var x = Math.sin(v) * Math.cos(u) * R, y = Math.cos(v) * R, z = Math.sin(v) * Math.sin(u) * R;
-    pos.push(x, y, z);
-    nrm.push(-x / R, -y / R, -z / R);
-    var t = (y / R + 1) * 0.5;
-    col.push(0.07 + Math.pow(1 - t, 3) * 0.42,
-             0.08 + Math.pow(1 - t, 3) * 0.30,
-             0.12 + Math.pow(1 - t, 2.4) * 0.16, 1);
-  }
-  for (var j2 = 0; j2 < seg; j2++) for (var i2 = 0; i2 < seg; i2++) {
-    var a = j2 * n + i2, b = a + 1, c = a + n, d = c + 1;
-    idx.push(a, c, b, b, c, d);      // дивимось зсередини, тож намотка зворотна
-  }
-  var m = new BABYLON.Mesh('sky', bscene);
-  var vd = new BABYLON.VertexData();
-  vd.positions = pos; vd.indices = idx; vd.normals = nrm; vd.colors = col;
-  vd.applyToMesh(m);
+  var tex = new BABYLON.DynamicTexture('skytex', { width: 4, height: 256 }, bscene, false);
+  var c = tex.getContext();
+  var g = c.createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0.00, 'rgb(22,26,44)');
+  g.addColorStop(0.34, 'rgb(44,50,76)');
+  g.addColorStop(0.60, 'rgb(78,80,104)');
+  g.addColorStop(0.80, 'rgb(126,110,106)');
+  g.addColorStop(0.92, 'rgb(178,134,100)');
+  g.addColorStop(1.00, 'rgb(96,78,66)');
+  c.fillStyle = g; c.fillRect(0, 0, 4, 256);
+  tex.update();
+  var m = BABYLON.MeshBuilder.CreateSphere('sky', { diameter: 1300, segments: 20, sideOrientation: BABYLON.Mesh.BACKSIDE }, bscene);
   var mat = new BABYLON.StandardMaterial('skymat', bscene);
   mat.disableLighting = true;
-  mat.emissiveColor = new BABYLON.Color3(1, 1, 1);
+  mat.emissiveTexture = tex;
   mat.diffuseColor = new BABYLON.Color3(0, 0, 0);
+  mat.specularColor = new BABYLON.Color3(0, 0, 0);
   mat.fogEnabled = false;
   mat.backFaceCulling = false;
   m.material = mat;
-  m.useVertexColors = true;
-  m.infiniteDistance = true;
+  // гравець не відходить далі ста сорока одиниць від центру, тож нерухома
+  // сфера завжди навколо нього; infiniteDistance давав обрізану панель збоку
+  m.isPickable = false;
+  // усе лишається в групі 0: Babylon чистить буфер глибини між групами,
+  // тож ландшафт у групі 1 затирав і гравця, і весь реквізит
 })();
 
 /* ================= золотий карась удалині ================= */
@@ -1114,12 +1337,12 @@ var bigKaras;
   vd.applyToMesh(m);
   var mat = new BABYLON.StandardMaterial('mntmat', bscene);
   mat.disableLighting = true;
-  mat.emissiveColor = new BABYLON.Color3(1, 1, 1);
+  mat.emissiveColor = new BABYLON.Color3(0.085, 0.092, 0.118);
   mat.diffuseColor = new BABYLON.Color3(0, 0, 0);
   mat.fogEnabled = false;
   mat.backFaceCulling = false;
   m.material = mat;
-  m.useVertexColors = true;
+  m.isPickable = false;
 })();
 
 /* тло в сцені постійно; зона лише вмикає або гасить карася */
@@ -1193,7 +1416,7 @@ ZONES.field = {
     root.add(buildTerrainMesh(ZONES.field.h, 340, 176, function(x, z){
       var t = Math.max(0, 1 - roadDist(x, z) / 4.2);
       var m = 0.78 + 0.42 * (Math.sin(x * 0.7) * Math.cos(z * 0.6) * 0.5 + 0.5);
-      return [(0.115 + t * 0.10) * m, (0.125 + t * 0.075) * m, (0.095 + t * 0.055) * m];
+      return [(0.27 + t * 0.17) * m, (0.29 + t * 0.13) * m, (0.21 + t * 0.10) * m];
     }));
   /* ================= каплиця ================= */
 
@@ -1411,7 +1634,7 @@ ZONES.field = {
     g.position.set(bx, by, bz);
     g.rotation.y = 0.6;
     root.add(g);
-    var bone = new THREE.MeshLambertMaterial({ color: 0xcfc6ac });
+    var bone = M.bone;
     // хребет
     for (var i = 0; i < 16; i++) {
       var v = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.6, 1.0), bone);
@@ -3283,6 +3506,32 @@ loadZone('field');
 makeBoss();
 syncUI();
 
+/* ---- автоматична якість ----
+   Пост-обробка й тіні коштують стільки ж, скільки вся геометрія разом.
+   На потужній машині це непомітно, на слабкій — гра перетворюється на слайди,
+   тож міряємо справжній час кадру й зрізаємо шари, поки не стане грабельно. */
+var QA = { n: 0, acc: 0, step: 0 };
+function autoQuality(dt){
+  if (LOWFX || FXMAX || QA.step >= 3 || G.mode !== 'play') return;
+  QA.n++; QA.acc += dt;
+  if (QA.n < 90) return;
+  var ms = QA.acc / QA.n * 1000;
+  QA.n = 0; QA.acc = 0;
+  if (ms < 30) { QA.step = 3; return; }      // тягне — більше не чіпаємо
+  var pm = bscene.postProcessRenderPipelineManager, bc = camera.__b;
+  QA.step++;
+  try {
+    if (QA.step === 1) {
+      pm.detachCamerasFromRenderPipeline('ssao', bc);
+    } else if (QA.step === 2) {
+      if (shadowGen) { shadowGen.getShadowMap().renderList.length = 0; }
+      for (var i = 0; i < bscene.meshes.length; i++) bscene.meshes[i].receiveShadows = false;
+    } else {
+      pm.detachCamerasFromRenderPipeline('look', bc);
+    }
+  } catch (e) { QA.step = 3; }
+}
+
 var last = 0, acc = 0;
 function frame(now){
   requestAnimationFrame(frame);
@@ -3293,6 +3542,7 @@ function frame(now){
   // мікрозупинка на влучанні: без неї удар не відчувається
   if (G.freeze > 0) { G.freeze -= dt; if (G.mode === 'play') { updateCamera(dt); renderer.render(scene, camera); return; } }
   G.t += dt;
+  autoQuality(dt);
 
   if (G.mode === 'play') {
     updatePlayer(dt);

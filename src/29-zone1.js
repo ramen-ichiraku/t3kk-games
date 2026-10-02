@@ -66,7 +66,7 @@ ZONES.field = {
     root.add(buildTerrainMesh(ZONES.field.h, 340, 176, function(x, z){
       var t = Math.max(0, 1 - roadDist(x, z) / 4.2);
       var m = 0.78 + 0.42 * (Math.sin(x * 0.7) * Math.cos(z * 0.6) * 0.5 + 0.5);
-      return [(0.115 + t * 0.10) * m, (0.125 + t * 0.075) * m, (0.095 + t * 0.055) * m];
+      return [(0.27 + t * 0.17) * m, (0.29 + t * 0.13) * m, (0.21 + t * 0.10) * m];
     }));
   /* ================= каплиця ================= */
 
@@ -284,7 +284,7 @@ ZONES.field = {
     g.position.set(bx, by, bz);
     g.rotation.y = 0.6;
     root.add(g);
-    var bone = new THREE.MeshLambertMaterial({ color: 0xcfc6ac });
+    var bone = M.bone;
     // хребет
     for (var i = 0; i < 16; i++) {
       var v = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.6, 1.0), bone);

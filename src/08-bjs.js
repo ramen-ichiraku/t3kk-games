@@ -13,6 +13,9 @@
    протилежна — див. buildTerrainMesh і тло. */
 
 var LOWFX = /(\?|&)fx=low/.test(location.search);
+// fx=max — для знімків і замірів: не дає автоякості зрізати шари на повільному
+// програмному рендерері, де справжнього часу кадру все одно не дізнатись
+var FXMAX = /(\?|&)fx=max/.test(location.search);
 
 var __cv = document.createElement('canvas');
 __cv.id = 'cv';
@@ -24,7 +27,7 @@ bscene.ambientColor = new BABYLON.Color3(0, 0, 0);
 var shadowGen = null;
 /* Babylon реагує на світло інакше за Three: один спільний регулятор,
    щоб не правити інтенсивність у кожній лампі окремо */
-var GAIN = { point: 3.6, dir: 3.4, hemi: 3.4, amb: 3.2 };
+var GAIN = { point: 4.6, dir: 4.2, hemi: 4.2, amb: 4.0 };
 
 var __n = 0;
 function __nn(p){ return p + (++__n); }
@@ -172,16 +175,30 @@ function makeMat(o, basic){
   Object.defineProperty(m, 'opacity', { get: function(){ return m.alpha; }, set: function(v){ m.alpha = v; }, configurable: true });
   Object.defineProperty(m, 'transparent', { get: function(){ return m.alpha < 1; }, set: function(){}, configurable: true });
   m.clone0 = m.clone;
-  m.clone = function(){ var c = m.clone0(__nn('mat')); return decorateMat(c); };
+  m.clone = function(){ return decorateMat(reshareTex(m, m.clone0(__nn('mat')))); };
   return m;
 }
+/* Babylon клонує разом із матеріалом і його текстури, а копія DynamicTexture
+   виходить порожньою й ніколи не стає готовою — StandardMaterial через це
+   вважає меш неготовим і взагалі його не малює. Герой і вороги клонують
+   матеріали заради спалаху від удару, тож повертаємо спільні текстури назад. */
+var TEX_SLOTS = ['diffuseTexture', 'bumpTexture', 'emissiveTexture', 'specularTexture',
+                 'ambientTexture', 'opacityTexture', 'reflectionTexture'];
+function reshareTex(src, dst){
+  for (var i = 0; i < TEX_SLOTS.length; i++) {
+    var k = TEX_SLOTS[i];
+    if (src[k] && dst[k] !== src[k]) { if (dst[k]) dst[k].dispose(); dst[k] = src[k]; }
+  }
+  return dst;
+}
+
 function decorateMat(m){
   Object.defineProperty(m, 'emissive', { get: function(){ return m.emissiveColor; }, configurable: true });
   Object.defineProperty(m, 'opacity', { get: function(){ return m.alpha; }, set: function(v){ m.alpha = v; }, configurable: true });
   Object.defineProperty(m, 'transparent', { get: function(){ return m.alpha < 1; }, set: function(){}, configurable: true });
   if (!m.userData) m.userData = {};
   m.clone0 = m.clone0 || m.clone;
-  m.clone = function(){ return decorateMat(m.clone0(__nn('mat'))); };
+  m.clone = function(){ return decorateMat(reshareTex(m, m.clone0(__nn('mat')))); };
   return m;
 }
 
@@ -262,7 +279,20 @@ var THREE = {
     } };
     L.shadow = { mapSize: { set: function(){} }, camera: {}, bias: 0 };
     Object.defineProperty(L, 'castShadow', {
-      set: function(v){ if (v && !shadowGen) { shadowGen = new BABYLON.ShadowGenerator(LOWFX ? 512 : 1024, L); shadowGen.useExponentialShadowMap = true; shadowGen.darkness = 0.45; } },
+      set: function(v){ if (v && !shadowGen) {
+        // кадр тіні тримаємо малим і прив'язаним до гравця: автопідбір
+        // розтягував його на всі 340 одиниць карти, і текстури не вистачало —
+        // уся сцена вкривалась самозатіненням і ставала майже чорною
+        L.autoUpdateExtends = false;
+        L.orthoLeft = -30; L.orthoRight = 30; L.orthoTop = 30; L.orthoBottom = -30;
+        L.shadowMinZ = 1; L.shadowMaxZ = 160;
+        shadowGen = new BABYLON.ShadowGenerator(LOWFX ? 512 : 2048, L);
+        shadowGen.usePercentageCloserFiltering = true;
+        shadowGen.filteringQuality = BABYLON.ShadowGenerator.QUALITY_MEDIUM;
+        shadowGen.bias = 0.008;
+        shadowGen.normalBias = 0.02;
+        shadowGen.darkness = 0.38;
+      } },
       get: function(){ return !!shadowGen; }, configurable: true
     });
     return L;

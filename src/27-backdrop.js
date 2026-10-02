@@ -1,34 +1,32 @@
-/* ================= небо ================= */
+/* ================= небо =================
+   Кольори вершин у Babylon не діють на самосвітні матеріали,
+   тож градієнт малюємо в текстуру. */
 (function(){
-  var seg = 24, n = seg + 1, R = 520;
-  var pos = [], idx = [], col = [], nrm = [];
-  for (var j = 0; j < n; j++) for (var i = 0; i < n; i++) {
-    var u = i / seg * Math.PI * 2, v = j / seg * Math.PI;
-    var x = Math.sin(v) * Math.cos(u) * R, y = Math.cos(v) * R, z = Math.sin(v) * Math.sin(u) * R;
-    pos.push(x, y, z);
-    nrm.push(-x / R, -y / R, -z / R);
-    var t = (y / R + 1) * 0.5;
-    col.push(0.07 + Math.pow(1 - t, 3) * 0.42,
-             0.08 + Math.pow(1 - t, 3) * 0.30,
-             0.12 + Math.pow(1 - t, 2.4) * 0.16, 1);
-  }
-  for (var j2 = 0; j2 < seg; j2++) for (var i2 = 0; i2 < seg; i2++) {
-    var a = j2 * n + i2, b = a + 1, c = a + n, d = c + 1;
-    idx.push(a, c, b, b, c, d);      // дивимось зсередини, тож намотка зворотна
-  }
-  var m = new BABYLON.Mesh('sky', bscene);
-  var vd = new BABYLON.VertexData();
-  vd.positions = pos; vd.indices = idx; vd.normals = nrm; vd.colors = col;
-  vd.applyToMesh(m);
+  var tex = new BABYLON.DynamicTexture('skytex', { width: 4, height: 256 }, bscene, false);
+  var c = tex.getContext();
+  var g = c.createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0.00, 'rgb(22,26,44)');
+  g.addColorStop(0.34, 'rgb(44,50,76)');
+  g.addColorStop(0.60, 'rgb(78,80,104)');
+  g.addColorStop(0.80, 'rgb(126,110,106)');
+  g.addColorStop(0.92, 'rgb(178,134,100)');
+  g.addColorStop(1.00, 'rgb(96,78,66)');
+  c.fillStyle = g; c.fillRect(0, 0, 4, 256);
+  tex.update();
+  var m = BABYLON.MeshBuilder.CreateSphere('sky', { diameter: 1300, segments: 20, sideOrientation: BABYLON.Mesh.BACKSIDE }, bscene);
   var mat = new BABYLON.StandardMaterial('skymat', bscene);
   mat.disableLighting = true;
-  mat.emissiveColor = new BABYLON.Color3(1, 1, 1);
+  mat.emissiveTexture = tex;
   mat.diffuseColor = new BABYLON.Color3(0, 0, 0);
+  mat.specularColor = new BABYLON.Color3(0, 0, 0);
   mat.fogEnabled = false;
   mat.backFaceCulling = false;
   m.material = mat;
-  m.useVertexColors = true;
-  m.infiniteDistance = true;
+  // гравець не відходить далі ста сорока одиниць від центру, тож нерухома
+  // сфера завжди навколо нього; infiniteDistance давав обрізану панель збоку
+  m.isPickable = false;
+  // усе лишається в групі 0: Babylon чистить буфер глибини між групами,
+  // тож ландшафт у групі 1 затирав і гравця, і весь реквізит
 })();
 
 /* ================= золотий карась удалині ================= */
@@ -127,12 +125,12 @@ var bigKaras;
   vd.applyToMesh(m);
   var mat = new BABYLON.StandardMaterial('mntmat', bscene);
   mat.disableLighting = true;
-  mat.emissiveColor = new BABYLON.Color3(1, 1, 1);
+  mat.emissiveColor = new BABYLON.Color3(0.085, 0.092, 0.118);
   mat.diffuseColor = new BABYLON.Color3(0, 0, 0);
   mat.fogEnabled = false;
   mat.backFaceCulling = false;
   m.material = mat;
-  m.useVertexColors = true;
+  m.isPickable = false;
 })();
 
 /* тло в сцені постійно; зона лише вмикає або гасить карася */

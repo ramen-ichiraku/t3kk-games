@@ -17,11 +17,12 @@ function zoneEdge(){ return (ZONE && ZONE.edge) || EDGE; }
 
 /* рельєф зони: один меш із забарвленням по висоті й дорозі */
 function buildTerrainMesh(hFn, size, seg, tint){
-  var pos = [], idx = [], col = [], n = seg + 1, step = size / seg;
+  var pos = [], idx = [], col = [], uvs = [], n = seg + 1, step = size / seg;
   for (var j = 0; j < n; j++) for (var i = 0; i < n; i++) {
     var x = -size / 2 + i * step, z = -size / 2 + j * step;
     var y = hFn(x, z);
     pos.push(x, y, z);
+    uvs.push(i / seg, j / seg);          // без них карта нормалей дає сміття
     var c = tint(x, z, y);
     col.push(c[0], c[1], c[2], 1);
   }
@@ -33,10 +34,19 @@ function buildTerrainMesh(hFn, size, seg, tint){
   BABYLON.VertexData.ComputeNormals(pos, idx, nrm);
   var m = new BABYLON.Mesh('terrain', bscene);
   var vd = new BABYLON.VertexData();
-  vd.positions = pos; vd.indices = idx; vd.normals = nrm; vd.colors = col;
+  vd.positions = pos; vd.indices = idx; vd.normals = nrm; vd.colors = col; vd.uvs = uvs;
   vd.applyToMesh(m);
   var mat = new BABYLON.StandardMaterial('terrmat', bscene);
   mat.specularColor = new BABYLON.Color3(0, 0, 0);
+  if (!LOWFX) {
+    var gt = makeTex('ground', { vary: 0.5, seed: 5, oct: 4, bump: 2.0, warm: 0.12 });
+    mat.diffuseTexture = gt.diffuse;
+    mat.bumpTexture = gt.bump;
+    mat.bumpTexture.level = 0.55;
+    var gs = size / 7;
+    mat.diffuseTexture.uScale = mat.diffuseTexture.vScale = gs;
+    mat.bumpTexture.uScale = mat.bumpTexture.vScale = gs;
+  }
   m.material = mat;
   m.useVertexColors = true;
   m.receiveShadows = !LOWFX;

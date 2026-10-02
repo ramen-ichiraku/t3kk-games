@@ -4,6 +4,32 @@ loadZone('field');
 makeBoss();
 syncUI();
 
+/* ---- автоматична якість ----
+   Пост-обробка й тіні коштують стільки ж, скільки вся геометрія разом.
+   На потужній машині це непомітно, на слабкій — гра перетворюється на слайди,
+   тож міряємо справжній час кадру й зрізаємо шари, поки не стане грабельно. */
+var QA = { n: 0, acc: 0, step: 0 };
+function autoQuality(dt){
+  if (LOWFX || FXMAX || QA.step >= 3 || G.mode !== 'play') return;
+  QA.n++; QA.acc += dt;
+  if (QA.n < 90) return;
+  var ms = QA.acc / QA.n * 1000;
+  QA.n = 0; QA.acc = 0;
+  if (ms < 30) { QA.step = 3; return; }      // тягне — більше не чіпаємо
+  var pm = bscene.postProcessRenderPipelineManager, bc = camera.__b;
+  QA.step++;
+  try {
+    if (QA.step === 1) {
+      pm.detachCamerasFromRenderPipeline('ssao', bc);
+    } else if (QA.step === 2) {
+      if (shadowGen) { shadowGen.getShadowMap().renderList.length = 0; }
+      for (var i = 0; i < bscene.meshes.length; i++) bscene.meshes[i].receiveShadows = false;
+    } else {
+      pm.detachCamerasFromRenderPipeline('look', bc);
+    }
+  } catch (e) { QA.step = 3; }
+}
+
 var last = 0, acc = 0;
 function frame(now){
   requestAnimationFrame(frame);
@@ -14,6 +40,7 @@ function frame(now){
   // мікрозупинка на влучанні: без неї удар не відчувається
   if (G.freeze > 0) { G.freeze -= dt; if (G.mode === 'play') { updateCamera(dt); renderer.render(scene, camera); return; } }
   G.t += dt;
+  autoQuality(dt);
 
   if (G.mode === 'play') {
     updatePlayer(dt);

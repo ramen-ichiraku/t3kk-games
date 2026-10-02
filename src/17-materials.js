@@ -16,8 +16,29 @@ var M = {
   wood:   mat(0x46392c), dark: mat(0x1b1d22),
   wall:   mat(0x6b6153), wallD: mat(0x4d463b),
   boss:   mat(0x6c6f4a), bossD: mat(0x3e4230), bossT: mat(0x8d7b3a, { emissive: 0x2b1f05 }),
-  ember:  mat(0xff7a2a, { emissive: 0xc23c05 })
+  ember:  mat(0xff7a2a, { emissive: 0xc23c05 }),
+  bone:   mat(0xb4ab92)
 };
+
+/* поверхні перестають бути пластиковими: текстура лише модулює колір */
+skin(M.stone,  'rough',  { vary: 0.42, seed: 11, bump: 3.0 }, 3);
+skin(M.stoneD, 'roughD', { vary: 0.40, seed: 23, bump: 3.0 }, 3);
+skin(M.stoneL, 'roughL', { vary: 0.38, seed: 31, bump: 2.6 }, 2);
+skin(M.wall,   'wall',   { vary: 0.34, seed: 41, bump: 2.4, warm: 0.10 }, 2);
+skin(M.wallD,  'wallD',  { vary: 0.32, seed: 43, bump: 2.4, warm: 0.10 }, 2);
+skin(M.wood,   'wood',   { vary: 0.46, seed: 53, streak: 7, bump: 3.2, warm: 0.14 }, 2);
+skin(M.scale,  'scales', { vary: 0.26, seed: 61, scaleRows: 9, bump: 2.0 }, 3.2);
+skin(M.scaleD, 'scalesD',{ vary: 0.26, seed: 67, scaleRows: 9, bump: 2.0 }, 3.2);
+skin(M.foeA,   'foeA',   { vary: 0.30, seed: 71, scaleRows: 7, bump: 2.2 }, 3.0);
+skin(M.foeB,   'foeB',   { vary: 0.30, seed: 73, scaleRows: 7, bump: 2.2 }, 3.0);
+skin(M.rust,   'rust',   { vary: 0.44, seed: 79, bump: 2.8, warm: 0.18 }, 2);
+skin(M.skin,   'hide',   { vary: 0.16, seed: 83, bump: 1.4 }, 1.2);
+skin(M.bread,  'crumb',  { vary: 0.40, seed: 89, oct: 4, bump: 3.4, warm: 0.12 }, 2);
+skin(M.crust,  'crust',  { vary: 0.42, seed: 97, oct: 4, bump: 3.4, warm: 0.16 }, 2);
+skin(M.bone,   'bone',   { vary: 0.30, seed: 109, bump: 2.2, warm: 0.08 }, 2);
+skin(M.cloth,  'cloth',  { vary: 0.26, seed: 101, streak: 14, bump: 1.8 }, 2);
+skin(M.boss,   'bossA',  { vary: 0.28, seed: 103, scaleRows: 8, bump: 2.4 }, 2.6);
+skin(M.bossD,  'bossD',  { vary: 0.28, seed: 107, scaleRows: 8, bump: 2.4 }, 2.6);
 
 SHARED_MATS = new Set();
 for (var mk in M) if (M.hasOwnProperty(mk)) SHARED_MATS.add(M[mk]);
