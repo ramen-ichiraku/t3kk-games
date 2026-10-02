@@ -17,7 +17,7 @@ var M = {
   wall:   mat(0x6b6153), wallD: mat(0x4d463b),
   boss:   mat(0x6c6f4a), bossD: mat(0x3e4230), bossT: mat(0x8d7b3a, { emissive: 0x2b1f05 }),
   ember:  mat(0xff7a2a, { emissive: 0xc23c05 }),
-  bone:   mat(0xb4ab92)
+  bone:   mat(0x8e8673)
 };
 
 /* поверхні перестають бути пластиковими: текстура лише модулює колір */

@@ -1158,7 +1158,7 @@ var M = {
   wall:   mat(0x6b6153), wallD: mat(0x4d463b),
   boss:   mat(0x6c6f4a), bossD: mat(0x3e4230), bossT: mat(0x8d7b3a, { emissive: 0x2b1f05 }),
   ember:  mat(0xff7a2a, { emissive: 0xc23c05 }),
-  bone:   mat(0xb4ab92)
+  bone:   mat(0x8e8673)
 };
 
 /* поверхні перестають бути пластиковими: текстура лише модулює колір */
@@ -2230,15 +2230,27 @@ ZONES.field = {
       w.castShadow = !LOWFX;
       root.add(w);
       addWall(rx, rz, 3.2, ry + 9);
+      // під стіною — каміння й уламки, щоб стик зі скелею не читався як шов
+      if (a % 3 === 0) {
+        var ia = an + rr(-0.06, 0.06), ir = ARENA.r - rr(0.2, 1.4);
+        placeModel(root, rnd() < 0.5 ? 'rocks-tall' : 'rocks',
+          ARENA.x + Math.cos(ia) * ir, ARENA.z + Math.sin(ia) * ir, { s: rr(2.2, 4.0) });
+      }
     }
     // жаровні в залі
     [[0, -1], [1, 0], [-1, 0], [0.75, 0.75], [-0.75, 0.75]].forEach(function(d){
       var bx = ARENA.x + d[0] * (ARENA.r - 2.6), bz = ARENA.z + d[1] * (ARENA.r - 2.6);
       var by = hAt(bx, bz);
-      var st = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.5, 1.5, 6), M.rust);
-      st.position.set(bx, by + 0.75, bz); root.add(st);
-      var bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.78, 0.44, 0.5, 8), M.rust);
-      bowl.position.set(bx, by + 1.65, bz); root.add(bowl);
+      var col = model('pillar-square', { s: 1.6 });
+      if (col) { col.position.set(bx, by, bz); root.add(col); }
+      var brz = model('brazier', { s: 3.4 });
+      if (brz) { brz.position.set(bx, by + 1.75, bz); root.add(brz); }
+      if (!col) {
+        var st = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.5, 1.5, 6), M.rust);
+        st.position.set(bx, by + 0.75, bz); root.add(st);
+        var bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.78, 0.44, 0.5, 8), M.rust);
+        bowl.position.set(bx, by + 1.65, bz); root.add(bowl);
+      }
       var f = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.8, 6), M.ember);
       f.position.set(bx, by + 2.1, bz); root.add(f);
       var L = new THREE.PointLight(0xff8a3a, 1.25, 17);
@@ -2246,14 +2258,28 @@ ZONES.field = {
       flames.push({ mesh: f, light: L, p: rnd() * 6 });
       addWall(bx, bz, 0.5, by + 2.2);
     });
-    // кістки
+    // кістки й те, що лишилось від тих, хто сюди вже заходив
     for (var b2 = 0; b2 < 30; b2++) {
       var ba = rnd() * Math.PI * 2, br2 = rnd() * (ARENA.r - 2);
       var bx2 = ARENA.x + Math.cos(ba) * br2, bz2 = ARENA.z + Math.sin(ba) * br2;
-      var bn = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.6 + rnd() * 0.8, 5), M.skin);
+      var bn = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.6 + rnd() * 0.8, 5), M.bone);
       bn.position.set(bx2, hAt(bx2, bz2) + 0.08, bz2);
       bn.rotation.set(Math.PI / 2, rnd() * 3, rnd() * 3);
       root.add(bn);
+    }
+    var LEFT = ['grave-debris', 'debris', 'debris-wood', 'urn', 'crate', 'barrel-open', 'bucket', 'planks'];
+    for (var b3 = 0; b3 < 14; b3++) {
+      var la = rnd() * Math.PI * 2, lr = 3 + rnd() * (ARENA.r - 5);
+      placeModel(root, LEFT[(rnd() * LEFT.length) | 0],
+        ARENA.x + Math.cos(la) * lr, ARENA.z + Math.sin(la) * lr,
+        { s: rr(1.8, 2.8), tilt: rr(-0.4, 0.4) });
+    }
+    // обеліски по колу: арена має читатись як зала, а не як галявина
+    for (var b4 = 0; b4 < 6; b4++) {
+      var oa = b4 / 6 * Math.PI * 2 + 0.4, orr = ARENA.r - 3.2;
+      var ox2 = ARENA.x + Math.cos(oa) * orr, oz2 = ARENA.z + Math.sin(oa) * orr;
+      if (placeModel(root, 'obelisk', ox2, oz2, { s: rr(3.6, 5.2), tilt: rr(-0.12, 0.12) }))
+        addWall(ox2, oz2, 0.7, hAt(ox2, oz2) + 4);
     }
   })();
 
