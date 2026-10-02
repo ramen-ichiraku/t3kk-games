@@ -153,6 +153,26 @@ function saveState(s){
     return;
   }
 
+  // перевірка ключа: сам ключ не друкуємо, лише звідки взявся й чи працює
+  if (has('--check')) {
+    const fromEnv = !!(process.env.MESHY_API_KEY && process.env.MESHY_API_KEY.trim());
+    const k = readKey();
+    console.log('джерело: ' + (fromEnv ? 'змінна оточення MESHY_API_KEY'
+                                       : path.join(os.homedir(), '.meshy', 'key.txt')));
+    console.log('довжина: ' + k.length + ' символів');
+    if (/\s/.test(k)) console.log('УВАГА: всередині ключа є пробіл або перенос рядка');
+    if (/^["']|["']$/.test(k)) console.log('УВАГА: ключ узято в лапки — їх треба прибрати');
+    if (/^MESHY_API_KEY\s*=/.test(k)) console.log('УВАГА: у файлі має бути лише значення, без назви змінної');
+    if (/^встав/i.test(k)) { console.log('це ще заглушка, а не ключ'); return; }
+    try {
+      const bal = await call('GET', API + '/v1/balance', null, k);
+      console.log('ключ робочий. Кредитів: ' + (bal && bal.balance !== undefined ? bal.balance : '?'));
+    } catch (e) {
+      console.log('ключ не прийнявся — ' + e.message.slice(0, 160));
+    }
+    return;
+  }
+
   const only = val('--only');
   const ids = only ? [only] : Object.keys(PARTS);
   for (const id of ids) if (!PARTS[id]) { console.error('нема такої деталі: ' + id); process.exit(2); }
