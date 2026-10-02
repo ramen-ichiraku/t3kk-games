@@ -1,0 +1,17 @@
+# Ніщо з цього не має потрапити в публічний репозиторій.
+# Ключі й таємниці
+*.key
+*.secret
+.env
+.env.*
+secrets/
+.meshy/
+
+# Службове
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+
+# Тимчасове з генерації моделей
+tools/tmp/
