@@ -8,9 +8,13 @@
    TransformNode, і далі гра працює незмінним кодом. Усе, що отримує цей
    меш — зіткнення, тіні, інстанси — це вже можливості Babylon.
 
-   Babylon ліворукий. Наша формула повороту (yaw -> вектор (sin, cos))
-   у ньому збігається, а от намотка трикутників власної геометрії
-   протилежна — див. buildTerrainMesh і тло. */
+   Сцена перемкнена в ПРАВУ систему координат. Babylon за замовчуванням
+   ліворукий, і через це картинка виходила дзеркальною по X: +X малювався
+   ліворуч. Разом із ним дзеркалилися миша по горизонталі, клавіші A і D
+   та поворот героя — меч через це дивився назад. Права система збігається
+   з математикою гри (і з glTF, якщо колись вантажитимемо готові моделі).
+   Намотка власної геометрії лишається такою, як її хоче колайдер Babylon:
+   відкидання граней рушій і так узгоджує з системою координат сам. */
 
 var LOWFX = /(\?|&)fx=low/.test(location.search);
 // fx=max — для знімків і замірів: не дає автоякості зрізати шари на повільному
@@ -22,6 +26,7 @@ __cv.id = 'cv';
 __cv.style.cssText = 'display:block;position:absolute;inset:0;width:100%;height:100%;outline:none';
 var engine = new BABYLON.Engine(__cv, !LOWFX, { stencil: false, preserveDrawingBuffer: false, antialias: !LOWFX });
 var bscene = new BABYLON.Scene(engine);
+bscene.useRightHandedSystem = true;
 bscene.collisionsEnabled = true;
 bscene.ambientColor = new BABYLON.Color3(0, 0, 0);
 var shadowGen = null;

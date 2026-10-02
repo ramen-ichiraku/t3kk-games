@@ -13,7 +13,7 @@ function updateCamera(dt){
   camPitchS += (camPitch - camPitchS) * Math.min(1, dt * 9);
   var camYaw0 = camYaw, camPitch0 = camPitch;
   camYaw = camYawS; camPitch = camPitchS;
-  var camDist = (G.lock && G.lock === boss) ? 9.2 : 6.2;
+  var camDist = (G.lock && G.lock === boss) ? 11.0 : 7.9;
   var dist = camDist;
   // йдемо від героя назовні й зупиняємось на першій перепоні
   for (var i = 1; i <= 10; i++) {
@@ -23,16 +23,16 @@ function updateCamera(dt){
     var sy2 = ty + (Math.sin(camPitch) * camDist + 0.4) * tt;
     if (sy2 < hAt(sx2, sz2) + 0.6 || blocked(sx2, sz2, sy2, 0.28)) { dist = camDist * (i - 1) / 10; break; }
   }
-  if (dist < 2.4) dist = 2.4;
+  if (dist < 3.2) dist = 3.2;
   // наближення різке, віддалення повільне — інакше камера смикається біля кожного каменя
   camDistNow += (dist - camDistNow) * Math.min(1, dt * (dist < camDistNow ? 18 : 3.5));
   dist = camDistNow;
   // камера трохи праворуч від осі: інакше герой затуляє того, з ким б'єшся
-  camSide += ((G.lock ? 1.05 : 0.72) - camSide) * Math.min(1, dt * 5);
+  camSide += ((G.lock ? 1.25 : 0.95) - camSide) * Math.min(1, dt * 5);
   var rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
   var want = new THREE.Vector3(
     tx + Math.sin(camYaw) * Math.cos(camPitch) * dist + rx * camSide,
-    ty + Math.sin(camPitch) * dist + 0.4 * (dist / camDist),
+    ty + Math.sin(camPitch) * dist + 0.62 * (dist / camDist),
     tz + Math.cos(camYaw) * Math.cos(camPitch) * dist + rz * camSide
   );
   var gh = hAt(want.x, want.z) + 0.7;
@@ -48,7 +48,7 @@ function updateCamera(dt){
   camera.lookAt(lx, ty + (G.lock ? 0.8 : 0.55), lz);
   camYaw = camYaw0; camPitch = camPitch0;
   // впритул героя не видно — робимо його напівпрозорим
-  var fadeK = dist < 3.0 ? Math.max(0.55, (dist - 2.1) / 0.9) : 1;
+  var fadeK = dist < 3.9 ? Math.max(0.5, (dist - 3.0) / 0.9) : 1;
   if (fadeK !== P.lastFade) {
     P.lastFade = fadeK;
     for (var fi = 0; fi < PMATS.length; fi++) {
