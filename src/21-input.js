@@ -1,8 +1,10 @@
 /* ================= ввід ================= */
-/* Браузер дає захопити мишу лише у відповідь на справжній клік. При
-   автозапуску з локального стенда виклик падає — ловимо, щоб не сипало
-   помилкою: гравець усе одно натисне й захопить сам. */
-function grabMouse(){
+/* Браузер дає захопити мишу лише у відповідь на СПРАВЖНІЙ клік. На штучний
+   він відмовляє — і, що гірше, після відмови блокує й наступні спроби, тож
+   миша не захоплювалась уже ніколи. Тому зі штучного кліку навіть не
+   пробуємо: гравець натисне сам, і тоді все спрацює з першого разу. */
+function grabMouse(e){
+  if (e && e.isTrusted === false) return;
   if (!cvs.requestPointerLock) return;
   try {
     var r = cvs.requestPointerLock();
@@ -41,7 +43,7 @@ var mouse = { dx:0, dy:0, locked:false, lmb:false, rmb:false };
 var cvs = renderer.domElement;
 cvs.addEventListener('mousedown', function(e){
   if (G.mode !== 'play') return;
-  if (!mouse.locked && cvs.requestPointerLock) { grabMouse(); return; }
+  if (!mouse.locked && cvs.requestPointerLock) { grabMouse(e); return; }
   if (e.button === 0) { mouse.lmb = true; attack(!!keys.ShiftLeft); }
   if (e.button === 1) { toggleLock(); e.preventDefault(); }
   if (e.button === 2) mouse.rmb = true;

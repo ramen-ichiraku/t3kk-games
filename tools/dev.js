@@ -56,17 +56,22 @@ const CLIENT = `
     window.addEventListener('beforeunload', save);
   }
 
+  // Гру НЕ запускаємо штучним кліком. Після b.click() браузер перестає
+  // видавати mousedown і mouseup — лишається самий click, — а гра слухає
+  // саме mousedown, тож і удари, і захоплення миші виявлялись мертві.
+  // Тому лише повертаємо героя на місце, а «Прокинутися» тисне людина:
+  // справжнє натискання до того ж єдине, чим браузер дозволяє захопити мишу.
   if (auto) {
     var t = setInterval(function(){
       if (!(window.__K3 && window.__K3.ready && window.__K3.ready())) return;
       clearInterval(t);
-      var b = document.getElementById('bGo');
-      if (b && !b.disabled) b.click();
       try {
         var p = JSON.parse(sessionStorage.getItem('dev.pos') || 'null');
         if (p) { window.__K3.tp(p.x, p.z); window.__K3.P.yaw = p.yaw; }
       } catch (e) {}
       startSaving();
+      var b = document.getElementById('bGo');
+      if (b) b.textContent = 'Прокинутися (стенд поверне тебе на місце)';
     }, 150);
   } else {
     startSaving();

@@ -14,12 +14,12 @@ function pause(on){
 }
 
 /* ================= кнопки ================= */
-document.getElementById('bGo').addEventListener('click', function(){
+document.getElementById('bGo').addEventListener('click', function(e){
   UI.cStart.hidden = true;
   G.mode = 'play';
   aInit(); musicStart();
   showArea('Каплиця Пробудження');
-  grabMouse();
+  grabMouse(e);
   syncUI();
 });
 document.getElementById('bRest').addEventListener('click', restAtFire);
