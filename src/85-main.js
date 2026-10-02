@@ -1,8 +1,22 @@
 /* ================= головний цикл ================= */
 P.hpMax = statHp(); P.stMax = statSt(); P.hp = P.hpMax; P.st = P.stMax;
-loadZone('field');
-makeBoss();
-syncUI();
+
+/* Світ будується аж після того, як прийдуть моделі: зони питають model(),
+   і без зразків вони б намалювали примітиви. Кнопку старту до того тримаємо
+   вимкненою, інакше гравець потрапить у недобудований світ. */
+var __bGo = document.getElementById('bGo');
+var __bGoText = __bGo.textContent;
+__bGo.disabled = true;
+__bGo.textContent = 'Завантаження…';
+loadModels(function(){
+  loadZone('field');
+  makeBoss();
+  syncUI();
+  G.ready = true;
+  __bGo.disabled = false;
+  __bGo.textContent = __bGoText;
+  requestAnimationFrame(frame);
+});
 
 /* ---- автоматична якість ----
    Пост-обробка й тіні коштують стільки ж, скільки вся геометрія разом.
@@ -191,6 +205,6 @@ window.__K3 = { P: P, G: G, foes: foes, getBoss: function(){ return boss; }, key
   freezeBoss: function(){ var b = boss; b.st = 'idle'; b.t = -999; b.next = 999; },
   scene: scene, cam: camera, karasObj: function(){ return bigKaras; }, THREE: THREE,
   karas: function(){ var v = bigKaras.position.clone(); v.project(camera); return { x: v.x.toFixed(2), y: v.y.toFixed(2), z: v.z.toFixed(2) }; },
-  tp: function(x, z){ P.x = x; P.z = z; P.y = hAt(x, z); } };
-
-requestAnimationFrame(frame);
+  tp: function(x, z){ P.x = x; P.z = z; P.y = hAt(x, z); },
+  ready: function(){ return !!G.ready; },
+  models: function(){ return { ok: MODELS_OK, total: MODEL_IDS.length }; } };

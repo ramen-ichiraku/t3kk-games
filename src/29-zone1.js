@@ -9,7 +9,7 @@ ZONES.field = {
   road: ROAD,
   edge: EDGE,
   spawn: { x: CHAPEL.x, z: CHAPEL.z + 1.8, yaw: Math.PI },
-  sky: { bg: 0x10131a, fog: 0x141821, near: 14, far: 140, sun: 0.62, amb: 0.2, hemi: 0.34 },
+  sky: { bg: 0x1d2233, fog: 0x2a3044, near: 18, far: 165, sun: 1.0, amb: 0.26, hemi: 0.62 },
 
   h: function(x, z){
     var h = Math.sin(x * 0.052) * 1.2 + Math.cos(z * 0.045) * 1.0 + Math.sin((x + z) * 0.026) * 1.7;
@@ -210,35 +210,46 @@ ZONES.field = {
   /* ================= орієнтири й забудова ================= */
 
   // спільні дрібниці
+  var ROCKS = ['rock-a', 'rock-b', 'rock-c', 'rocks', 'rocks-tall'];
   function scatterRocks(cx, cz, rad, n, minS, maxS){
     for (var i = 0; i < n; i++) {
       var a = rnd() * 6.283, r = rnd() * rad;
       var x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
       var sc = minS + rnd() * (maxS - minS);
-      var m = new THREE.Mesh(new THREE.DodecahedronGeometry(sc, 0), M.stone);
-      m.position.set(x, hAt(x, z) + sc * 0.35, z);
-      m.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3);
-      m.scale.set(1, rr(0.5, 0.9), rr(0.8, 1.2));
-      m.castShadow = !LOWFX;
-      root.add(m);
+      var m = modelAny(ROCKS, { s: sc * 2.1 });
+      if (m) {
+        m.position.set(x, hAt(x, z), z);
+        m.rotation.set(rr(-0.12, 0.12), rnd() * 6.283, rr(-0.12, 0.12));
+        root.add(m);
+      } else {
+        m = new THREE.Mesh(new THREE.DodecahedronGeometry(sc, 0), M.stone);
+        m.position.set(x, hAt(x, z) + sc * 0.35, z);
+        m.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3);
+        m.scale.set(1, rr(0.5, 0.9), rr(0.8, 1.2));
+        m.castShadow = !LOWFX;
+        root.add(m);
+      }
       if (sc > 1.0) addWall(x, z, sc * 0.75, hAt(x, z) + sc * 1.1);
     }
   }
+  var TREES = ['pine-dead', 'pine-crooked', 'pine', 'tree-tall', 'tree'];
   function deadTree(x, z, h){
     var y = hAt(x, z);
+    // h — бажана висота в метрах; моделі Kenney заввишки близько 2.3, звідси масштаб
+    var m = modelAny(TREES, { s: h / 2.3 });
+    if (m) {
+      m.position.set(x, y - 0.1, z);
+      m.rotation.set(rr(-0.05, 0.05), rnd() * 6.283, rr(-0.05, 0.05));
+      root.add(m);
+      addWall(x, z, 0.55, y + h);
+      return;
+    }
     var tr = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.46, h, 6), M.wood);
     tr.position.set(x, y + h / 2, z);
     tr.rotation.z = rr(-0.1, 0.1);
     tr.castShadow = !LOWFX;
     root.add(tr);
     addWall(x, z, 0.5, y + h);
-    for (var b = 0; b < 5; b++) {
-      var bl = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.14, 1.6 + rnd() * 1.8, 5), M.wood);
-      var ba = rnd() * 6.283;
-      bl.position.set(x + Math.cos(ba) * 0.7, y + h * (0.5 + rnd() * 0.45), z + Math.sin(ba) * 0.7);
-      bl.rotation.set(rr(-1, 1), ba, rr(-1.2, 1.2));
-      root.add(bl);
-    }
   }
 
   /* --- зруйнований будинок --- */
@@ -475,13 +486,17 @@ ZONES.field = {
       var ox = rx + side * 4.6, oz = rz + rr(-1.5, 1.5);
       if (Math.abs(oz - RIVER_Z) < 11) continue;
       var oy = hAt(ox, oz);
-      var post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 2.6, 6), M.wood);
-      post.position.set(ox, oy + 1.3, oz);
-      post.castShadow = !LOWFX;
-      root.add(post);
-      var lamp = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.4), M.rust);
-      lamp.position.set(ox, oy + 2.7, oz);
-      root.add(lamp);
+      var post = model('town-lantern', { s: 1.9 });
+      if (post) { post.position.set(ox, oy, oz); post.rotation.y = rnd() * 6.283; root.add(post); }
+      else {
+        post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 2.6, 6), M.wood);
+        post.position.set(ox, oy + 1.3, oz);
+        post.castShadow = !LOWFX;
+        root.add(post);
+        var lamp = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.4), M.rust);
+        lamp.position.set(ox, oy + 2.7, oz);
+        root.add(lamp);
+      }
       var fm = new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 5), M.ember);
       fm.position.set(ox, oy + 2.7, oz);
       root.add(fm);
@@ -509,62 +524,69 @@ ZONES.field = {
       if (roadDist(x, z) < 4.5 || !clear(x, z)) continue;
       deadTree(x, z, 4.5 + rnd() * 5);
     }
-    var rockG = new THREE.DodecahedronGeometry(1, 0);
-    var rocks = new THREE.InstancedMesh(rockG, M.stone, 150);
-    var zeroM = new THREE.Matrix4().makeScale(0, 0, 0);
-    for (var z0 = 0; z0 < 150; z0++) rocks.setMatrixAt(z0, zeroM);
-    rocks.castShadow = !LOWFX; rocks.receiveShadow = !LOWFX;
-    var m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(),
-        sv = new THREE.Vector3(), pv = new THREE.Vector3();
-    for (var k = 0; k < 150; k++) {
+    // Каміння й трава йдуть екземплярами однієї моделі, тож уся розсип
+    // коштує стільки ж викликів малювання, скільки один камінь.
+    for (var k = 0; k < 170; k++) {
       var aa = rnd() * 6.283, rr2 = 10 + rnd() * 96;
       var px = Math.cos(aa) * rr2, pz = Math.sin(aa) * rr2;
       if (!clear(px, pz)) continue;
       var s2 = 0.3 + rnd() * 1.6;
-      pv.set(px, hAt(px, pz) + s2 * 0.35, pz);
-      e.set(rnd() * 3, rnd() * 3, rnd() * 3); q.setFromEuler(e);
-      sv.set(s2, s2 * rr(0.5, 0.9), s2 * rr(0.7, 1.2));
-      m4.compose(pv, q, sv);
-      rocks.setMatrixAt(k, m4);
+      var rm = modelAny(ROCKS, { s: s2 * 2.0 });
+      if (rm) {
+        rm.position.set(px, hAt(px, pz), pz);
+        rm.rotation.set(rr(-0.14, 0.14), rnd() * 6.283, rr(-0.14, 0.14));
+        root.add(rm);
+      }
       if (s2 > 1.0) addWall(px, pz, s2 * 0.75, hAt(px, pz) + s2 * 1.15);
     }
-    rocks.instanceMatrix.needsUpdate = true;
-    root.add(rocks);
 
     // трава купами, а не рівним килимом
-    var bladeG = new THREE.ConeGeometry(0.16, 0.8, 3);
-    var grass = new THREE.InstancedMesh(bladeG, M.foeB, 900);
-    for (var z1 = 0; z1 < 900; z1++) grass.setMatrixAt(z1, zeroM);
+    var GRASS = ['grass', 'grass-large'];
     var gi = 0;
-    for (var cl = 0; cl < 70 && gi < 900; cl++) {
+    for (var cl = 0; cl < 90 && gi < 1100; cl++) {
       var ca = rnd() * 6.283, cr = 12 + rnd() * 92;
       var cx2 = Math.cos(ca) * cr, cz2 = Math.sin(ca) * cr;
       if (!clear(cx2, cz2)) continue;
-      var cnt = 6 + ((rnd() * 8) | 0);
-      for (var t = 0; t < cnt && gi < 900; t++) {
-        var gx = cx2 + rr(-2.6, 2.6), gz = cz2 + rr(-2.6, 2.6);
-        var gs = 0.5 + rnd() * 1.2;
-        pv.set(gx, hAt(gx, gz) + 0.3 * gs, gz);
-        e.set(rr(-0.2, 0.2), rnd() * 3, rr(-0.2, 0.2)); q.setFromEuler(e);
-        sv.set(gs, gs * rr(0.8, 1.9), gs);
-        m4.compose(pv, q, sv);
-        grass.setMatrixAt(gi++, m4);
+      var cnt = 8 + ((rnd() * 10) | 0);
+      for (var t = 0; t < cnt && gi < 1100; t++) {
+        var gx = cx2 + rr(-3.0, 3.0), gz = cz2 + rr(-3.0, 3.0);
+        var gm = modelAny(GRASS, { s: rr(1.6, 3.4), shadow: false });
+        if (!gm) break;
+        gm.position.set(gx, hAt(gx, gz), gz);
+        gm.rotation.y = rnd() * 6.283;
+        root.add(gm);
+        gi++;
       }
     }
-    grass.instanceMatrix.needsUpdate = true;
-    root.add(grass);
 
-    // надгробки біля каплиці
-    for (var s3 = 0; s3 < 14; s3++) {
-      var ga = rnd() * 6.283, gr = 13 + rnd() * 10;
+    // цвинтар біля каплиці
+    var GRAVES = ['grave-bevel', 'grave-broken', 'grave-cross', 'grave-round',
+                  'grave-wide', 'grave-debris', 'cross-wood', 'cross-stone'];
+    for (var s3 = 0; s3 < 26; s3++) {
+      var ga = rnd() * 6.283, gr = 12 + rnd() * 12;
       var ox = CHAPEL.x + Math.cos(ga) * gr, oz = CHAPEL.z + Math.sin(ga) * gr;
       var oy = hAt(ox, oz);
-      var st = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.4 + rnd(), 0.22), M.stoneL);
-      st.position.set(ox, oy + 0.75, oz);
-      st.rotation.set(rr(-0.13, 0.13), rnd() * 3, rr(-0.15, 0.15));
-      st.castShadow = !LOWFX;
+      var st = modelAny(GRAVES, { s: rr(1.9, 2.8) });
+      if (st) {
+        st.position.set(ox, oy, oz);
+        st.rotation.set(rr(-0.1, 0.1), rnd() * 6.283, rr(-0.12, 0.12));
+      } else {
+        st = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.4 + rnd(), 0.22), M.stoneL);
+        st.position.set(ox, oy + 0.75, oz);
+        st.rotation.set(rr(-0.13, 0.13), rnd() * 3, rr(-0.15, 0.15));
+        st.castShadow = !LOWFX;
+      }
       root.add(st);
     }
+    // склеп і вівтар як орієнтири на цвинтарі
+    (function(){
+      var cx3 = CHAPEL.x - 17, cz3 = CHAPEL.z - 4;
+      var cr3 = placeModel(root, 'crypt-small', cx3, cz3, { s: 3.0, yaw: 0.4 });
+      if (cr3) addBox(cx3, cz3, 2.1, 2.2, 0);
+      placeModel(root, 'altar', CHAPEL.x + 15, CHAPEL.z + 9, { s: 2.6, yaw: -0.8 });
+      placeModel(root, 'bench-broken', CHAPEL.x + 11, CHAPEL.z + 13, { s: 2.4 });
+      placeModel(root, 'obelisk', CHAPEL.x - 9, CHAPEL.z + 18, { s: 4.2, yaw: 0.2 });
+    })();
     // руїни арок уздовж дороги
     [[-12, 52], [14, 34], [-16, -14], [10, -34]].forEach(function(pp){
       var ax = pp[0], az = pp[1], ay = hAt(ax, az);
@@ -572,7 +594,9 @@ ZONES.field = {
       g2.position.set(ax, ay, az);
       g2.rotation.y = rnd() * 3;
       [-1, 1].forEach(function(s4){
-        var col = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.64, 5.6, 8), M.stoneL);
+        var col = model('column', { s: 5.0 });
+        if (col) { col.position.set(s4 * 2.3, 0, 0); g2.add(col); return; }
+        col = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.64, 5.6, 8), M.stoneL);
         col.position.set(s4 * 2.3, 2.8, 0); col.castShadow = !LOWFX;
         g2.add(col);
       });
