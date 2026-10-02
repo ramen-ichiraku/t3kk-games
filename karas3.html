@@ -327,8 +327,20 @@ function geo(k, a){ return { __geo: k, a: a }; }
 function buildGeo(g){
   var a = g.a, m;
   switch (g.__geo) {
-    case 'box':
-      return BABYLON.MeshBuilder.CreateBox(__nn('box'), { width: a[0], height: a[1], depth: a[2] }, bscene);
+    case 'box': {
+      // Текстура на коробці розтягується по всій грані, тому мур дев'ять
+      // метрів завдовжки й камінь завбільшки з долоню отримували однакову
+      // кількість малюнка — звідси розмиті смуги на стінах. Задаємо кожній
+      // грані свій діапазон UV, пропорційний її розміру у світі.
+      var bw = a[0], bh = a[1], bd = a[2], U = 2.5;
+      var fuv = [];
+      // порядок граней Babylon: +Z, -Z, +X, -X, +Y, -Y
+      var dims = [[bw, bh], [bw, bh], [bd, bh], [bd, bh], [bw, bd], [bw, bd]];
+      for (var fi = 0; fi < 6; fi++)
+        fuv.push(new BABYLON.Vector4(0, 0, dims[fi][0] / U, dims[fi][1] / U));
+      return BABYLON.MeshBuilder.CreateBox(__nn('box'),
+        { width: bw, height: bh, depth: bd, faceUV: fuv, wrap: true }, bscene);
+    }
     case 'sphere': {
       var o = { diameter: a[0] * 2, segments: Math.max(4, Math.round((a[1] || 12) / 2)) };
       if (a[4] !== undefined) o.slice = a[4] / Math.PI;      // напівсфера для лисини
@@ -1723,7 +1735,11 @@ ZONES.field = {
     addWall(x, z, 0.5, y + h);
   }
 
-  /* --- зруйнований будинок --- */
+  /* --- зруйнований будинок ---
+     Стіни збираються з модулів Kenney по 2.6 метра. Зіткнення лишаються
+     суцільними коробками, як були: гравцеві байдуже, зі скількох шматків
+     складена стіна, а от прохідність крізь шви була б одразу помітна. */
+  var MS = 2.6;
   function ruinHouse(x, z, rot, w, d, hgt, gaps){
     var y = hAt(x, z);
     var g = new THREE.Group();
@@ -1731,20 +1747,75 @@ ZONES.field = {
     g.rotation.y = rot;
     root.add(g);
     var t = 0.5;
-    function seg(lx, lz, sw, sd, sh){
-      var m = new THREE.Mesh(new THREE.BoxGeometry(sw, sh, sd), M.wall);
-      m.position.set(lx, sh / 2, lz);
-      m.castShadow = !LOWFX; m.receiveShadow = !LOWFX;
+
+    // розміри підганяємо під сітку модулів, щоб панелі сходились без щілин
+    var nx = Math.max(1, Math.round(w / MS)), nz = Math.max(1, Math.round(d / MS));
+    w = nx * MS; d = nz * MS;
+
+    function panel(lx, lz, ry, lvl, id){
+      var m = model(id, { s: MS });
+      if (!m) return false;
+      m.position.set(lx, lvl * MS, lz);
+      m.rotation.y = ry;
       g.add(m);
-      var c = Math.cos(rot), s2 = Math.sin(rot);
+      return true;
+    }
+    function pick(lvl, top){
+      if (top && rnd() < 0.42) return null;              // верх обвалився
+      if (rnd() < 0.16) return 'house-broken';
+      if (lvl === 0 && rnd() < 0.18) return 'house-window';
+      return 'house-wall';
+    }
+    // стіна вздовж Z (панель уже лежить уздовж Z, повертати не треба)
+    function runZ(lx, lvls, ry){
+      for (var j = 0; j < nz; j++)
+        for (var l = 0; l < lvls; l++) {
+          var id = pick(l, l === lvls - 1);
+          if (id) panel(lx, -d / 2 + MS * (j + 0.5), ry, l, id);
+        }
+    }
+    // стіна вздовж X
+    function runX(lz, lvls, ry, doorAt){
+      for (var i = 0; i < nx; i++)
+        for (var l = 0; l < lvls; l++) {
+          var id = (l === 0 && i === doorAt) ? 'house-door' : pick(l, l === lvls - 1);
+          if (id) panel(-w / 2 + MS * (i + 0.5), lz, ry, l, id);
+        }
+    }
+    var H = Math.max(1, Math.round(hgt / MS));
+    var hL = Math.max(1, Math.round(H * (gaps & 1 ? 0.5 : 1)));
+    var hR = Math.max(1, Math.round(H * (gaps & 2 ? 0.55 : 1)));
+    var hB = Math.max(1, Math.round(H * (gaps & 4 ? 0.45 : 1)));
+    var okMdl = hasModel('house-wall');
+    if (okMdl) {
+      runZ(-w / 2, hL, 0);
+      runZ(w / 2, hR, Math.PI);
+      runX(-d / 2, hB, Math.PI / 2, (nx / 2) | 0);
+      runX(d / 2, H, -Math.PI / 2, -1);
+    } else {
+      // без моделей — старі суцільні стіни
+      function seg(lx, lz, sw, sd, sh){
+        var m = new THREE.Mesh(new THREE.BoxGeometry(sw, sh, sd), M.wall);
+        m.position.set(lx, sh / 2, lz);
+        m.castShadow = !LOWFX; m.receiveShadow = !LOWFX;
+        g.add(m);
+      }
+      seg(-w / 2, 0, t, d, hgt * (gaps & 1 ? 0.45 : 1));
+      seg(w / 2, 0, t, d, hgt * (gaps & 2 ? 0.5 : 1));
+      seg(0, -d / 2, w, t, hgt * (gaps & 4 ? 0.4 : 1));
+      seg(0, d / 2, w, t, hgt);
+    }
+
+    // зіткнення: чотири суцільні стіни незалежно від того, з чого вони зібрані
+    var c = Math.cos(rot), s2 = Math.sin(rot);
+    function wallBox(lx, lz, sw, sd, sh){
       addBox(x + lx * c - lz * s2, z + lx * s2 + lz * c, sw / 2, sd / 2, rot, y + sh);
     }
-    // чотири стіни з проломами
-    seg(-w / 2, 0, t, d, hgt * (gaps & 1 ? 0.45 : 1));
-    seg(w / 2, 0, t, d, hgt * (gaps & 2 ? 0.5 : 1));
-    seg(0, -d / 2, w, t, hgt * (gaps & 4 ? 0.4 : 1));
-    seg(0, d / 2, w * 0.35, t, hgt);
-    seg(w * 0.34, d / 2, w * 0.32, t, hgt * 0.6);
+    wallBox(-w / 2, 0, t, d, hL * MS);
+    wallBox(w / 2, 0, t, d, hR * MS);
+    wallBox(0, -d / 2, w, t, hB * MS);
+    wallBox(0, d / 2, w, t, H * MS);
+
     // уламки даху
     for (var r = 0; r < 4; r++) {
       var beam = new THREE.Mesh(new THREE.BoxGeometry(w * 0.9, 0.22, 0.24), M.wood);
@@ -1757,6 +1828,13 @@ ZONES.field = {
     fl.position.y = 0.1; fl.receiveShadow = !LOWFX;
     g.add(fl);
     scatterRocks(x, z, Math.max(w, d) * 0.7, 5, 0.25, 0.6);
+    // що лишилось від господарства
+    var pr = ['barrel', 'barrel-open', 'crate', 'bucket', 'planks', 'firewood', 'hay', 'debris-wood'];
+    for (var q = 0; q < 4; q++) {
+      var qa = rnd() * 6.283, qr = Math.max(w, d) * (0.3 + rnd() * 0.3);
+      placeModel(root, pr[(rnd() * pr.length) | 0],
+        x + Math.cos(qa) * qr, z + Math.sin(qa) * qr, { s: rr(2.0, 3.0) });
+    }
   }
 
   /* --- кістяк велетенської риби: головний орієнтир поля --- */
@@ -3405,35 +3483,40 @@ function updateCamera(dt){
   camYaw = camYawS; camPitch = camPitchS;
   var camDist = (G.lock && G.lock === boss) ? 11.0 : 7.9;
   var dist = camDist;
-  // йдемо від героя назовні й зупиняємось на першій перепоні
-  for (var i = 1; i <= 10; i++) {
-    var tt = i / 10;
-    var sx2 = tx + Math.sin(camYaw) * Math.cos(camPitch) * camDist * tt;
-    var sz2 = tz + Math.cos(camYaw) * Math.cos(camPitch) * camDist * tt;
-    var sy2 = ty + (Math.sin(camPitch) * camDist + 0.4) * tt;
-    if (sy2 < hAt(sx2, sz2) + 0.6 || blocked(sx2, sz2, sy2, 0.28)) { dist = camDist * (i - 1) / 10; break; }
-  }
-  if (dist < 3.2) dist = 3.2;
-  // наближення різке, віддалення повільне — інакше камера смикається біля кожного каменя
-  camDistNow += (dist - camDistNow) * Math.min(1, dt * (dist < camDistNow ? 18 : 3.5));
-  dist = camDistNow;
   // камера трохи праворуч від осі: інакше герой затуляє того, з ким б'єшся
   camSide += ((G.lock ? 1.25 : 0.95) - camSide) * Math.min(1, dt * 5);
   var rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
+  // Йдемо від героя назовні по ТІЙ САМІЙ лінії, на якій камера реально стане,
+  // разом із виносом убік. Раніше перевірялась лише осьова лінія, і біля
+  // будинку винос заштовхував камеру крізь стіну — всередині було видно балки.
+  for (var i = 1; i <= 12; i++) {
+    var tt = i / 12;
+    var sx2 = tx + (Math.sin(camYaw) * Math.cos(camPitch) * camDist + rx * camSide) * tt;
+    var sz2 = tz + (Math.cos(camYaw) * Math.cos(camPitch) * camDist + rz * camSide) * tt;
+    var sy2 = ty + (Math.sin(camPitch) * camDist + 0.62) * tt;
+    if (sy2 < hAt(sx2, sz2) + 0.6 || blocked(sx2, sz2, sy2, 0.45)) { dist = camDist * (i - 1) / 12; break; }
+  }
+  if (dist < 2.6) dist = 2.6;
+  // наближення різке, віддалення повільне — інакше камера смикається біля кожного каменя
+  camDistNow += (dist - camDistNow) * Math.min(1, dt * (dist < camDistNow ? 18 : 3.5));
+  dist = camDistNow;
+  // винос убік стискається разом з відстанню, інакше впритул до стіни
+  // камера з'їжджає вбік сильніше, ніж назад
+  var sideNow = camSide * (dist / camDist);
   var want = new THREE.Vector3(
-    tx + Math.sin(camYaw) * Math.cos(camPitch) * dist + rx * camSide,
+    tx + Math.sin(camYaw) * Math.cos(camPitch) * dist + rx * sideNow,
     ty + Math.sin(camPitch) * dist + 0.62 * (dist / camDist),
-    tz + Math.cos(camYaw) * Math.cos(camPitch) * dist + rz * camSide
+    tz + Math.cos(camYaw) * Math.cos(camPitch) * dist + rz * sideNow
   );
   var gh = hAt(want.x, want.z) + 0.7;
   if (want.y < gh) want.y = gh;
   camNow.lerp(want, Math.min(1, dt * 11));
   camera.position.copy(camNow);
-  var lx = tx + rx * camSide * 0.55, lz = tz + rz * camSide * 0.55;
+  var lx = tx + rx * sideNow * 0.55, lz = tz + rz * sideNow * 0.55;
   if (G.lock) {
     // дивимось у точку між героєм і ціллю, щоб обидва були в кадрі
-    lx = tx + (G.lock.x - tx) * 0.34 + rx * camSide * 0.3;
-    lz = tz + (G.lock.z - tz) * 0.34 + rz * camSide * 0.3;
+    lx = tx + (G.lock.x - tx) * 0.34 + rx * sideNow * 0.3;
+    lz = tz + (G.lock.z - tz) * 0.34 + rz * sideNow * 0.3;
   }
   camera.lookAt(lx, ty + (G.lock ? 0.8 : 0.55), lz);
   camYaw = camYaw0; camPitch = camPitch0;
@@ -3855,6 +3938,7 @@ window.__K3 = { P: P, G: G, foes: foes, getBoss: function(){ return boss; }, key
   karas: function(){ var v = bigKaras.position.clone(); v.project(camera); return { x: v.x.toFixed(2), y: v.y.toFixed(2), z: v.z.toFixed(2) }; },
   tp: function(x, z){ P.x = x; P.z = z; P.y = hAt(x, z); },
   ready: function(){ return !!G.ready; },
+  free: function(x, z){ return !blocked(x, z, hAt(x, z) + 1.2, 0.5); },
   models: function(){ return { ok: MODELS_OK, total: MODEL_IDS.length }; } };
 })();
 </script>

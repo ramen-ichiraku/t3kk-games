@@ -207,4 +207,5 @@ window.__K3 = { P: P, G: G, foes: foes, getBoss: function(){ return boss; }, key
   karas: function(){ var v = bigKaras.position.clone(); v.project(camera); return { x: v.x.toFixed(2), y: v.y.toFixed(2), z: v.z.toFixed(2) }; },
   tp: function(x, z){ P.x = x; P.z = z; P.y = hAt(x, z); },
   ready: function(){ return !!G.ready; },
+  free: function(x, z){ return !blocked(x, z, hAt(x, z) + 1.2, 0.5); },
   models: function(){ return { ok: MODELS_OK, total: MODEL_IDS.length }; } };

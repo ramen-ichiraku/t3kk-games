@@ -15,35 +15,40 @@ function updateCamera(dt){
   camYaw = camYawS; camPitch = camPitchS;
   var camDist = (G.lock && G.lock === boss) ? 11.0 : 7.9;
   var dist = camDist;
-  // йдемо від героя назовні й зупиняємось на першій перепоні
-  for (var i = 1; i <= 10; i++) {
-    var tt = i / 10;
-    var sx2 = tx + Math.sin(camYaw) * Math.cos(camPitch) * camDist * tt;
-    var sz2 = tz + Math.cos(camYaw) * Math.cos(camPitch) * camDist * tt;
-    var sy2 = ty + (Math.sin(camPitch) * camDist + 0.4) * tt;
-    if (sy2 < hAt(sx2, sz2) + 0.6 || blocked(sx2, sz2, sy2, 0.28)) { dist = camDist * (i - 1) / 10; break; }
-  }
-  if (dist < 3.2) dist = 3.2;
-  // наближення різке, віддалення повільне — інакше камера смикається біля кожного каменя
-  camDistNow += (dist - camDistNow) * Math.min(1, dt * (dist < camDistNow ? 18 : 3.5));
-  dist = camDistNow;
   // камера трохи праворуч від осі: інакше герой затуляє того, з ким б'єшся
   camSide += ((G.lock ? 1.25 : 0.95) - camSide) * Math.min(1, dt * 5);
   var rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
+  // Йдемо від героя назовні по ТІЙ САМІЙ лінії, на якій камера реально стане,
+  // разом із виносом убік. Раніше перевірялась лише осьова лінія, і біля
+  // будинку винос заштовхував камеру крізь стіну — всередині було видно балки.
+  for (var i = 1; i <= 12; i++) {
+    var tt = i / 12;
+    var sx2 = tx + (Math.sin(camYaw) * Math.cos(camPitch) * camDist + rx * camSide) * tt;
+    var sz2 = tz + (Math.cos(camYaw) * Math.cos(camPitch) * camDist + rz * camSide) * tt;
+    var sy2 = ty + (Math.sin(camPitch) * camDist + 0.62) * tt;
+    if (sy2 < hAt(sx2, sz2) + 0.6 || blocked(sx2, sz2, sy2, 0.45)) { dist = camDist * (i - 1) / 12; break; }
+  }
+  if (dist < 2.6) dist = 2.6;
+  // наближення різке, віддалення повільне — інакше камера смикається біля кожного каменя
+  camDistNow += (dist - camDistNow) * Math.min(1, dt * (dist < camDistNow ? 18 : 3.5));
+  dist = camDistNow;
+  // винос убік стискається разом з відстанню, інакше впритул до стіни
+  // камера з'їжджає вбік сильніше, ніж назад
+  var sideNow = camSide * (dist / camDist);
   var want = new THREE.Vector3(
-    tx + Math.sin(camYaw) * Math.cos(camPitch) * dist + rx * camSide,
+    tx + Math.sin(camYaw) * Math.cos(camPitch) * dist + rx * sideNow,
     ty + Math.sin(camPitch) * dist + 0.62 * (dist / camDist),
-    tz + Math.cos(camYaw) * Math.cos(camPitch) * dist + rz * camSide
+    tz + Math.cos(camYaw) * Math.cos(camPitch) * dist + rz * sideNow
   );
   var gh = hAt(want.x, want.z) + 0.7;
   if (want.y < gh) want.y = gh;
   camNow.lerp(want, Math.min(1, dt * 11));
   camera.position.copy(camNow);
-  var lx = tx + rx * camSide * 0.55, lz = tz + rz * camSide * 0.55;
+  var lx = tx + rx * sideNow * 0.55, lz = tz + rz * sideNow * 0.55;
   if (G.lock) {
     // дивимось у точку між героєм і ціллю, щоб обидва були в кадрі
-    lx = tx + (G.lock.x - tx) * 0.34 + rx * camSide * 0.3;
-    lz = tz + (G.lock.z - tz) * 0.34 + rz * camSide * 0.3;
+    lx = tx + (G.lock.x - tx) * 0.34 + rx * sideNow * 0.3;
+    lz = tz + (G.lock.z - tz) * 0.34 + rz * sideNow * 0.3;
   }
   camera.lookAt(lx, ty + (G.lock ? 0.8 : 0.55), lz);
   camYaw = camYaw0; camPitch = camPitch0;

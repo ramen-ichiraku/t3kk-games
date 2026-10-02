@@ -252,7 +252,11 @@ ZONES.field = {
     addWall(x, z, 0.5, y + h);
   }
 
-  /* --- зруйнований будинок --- */
+  /* --- зруйнований будинок ---
+     Стіни збираються з модулів Kenney по 2.6 метра. Зіткнення лишаються
+     суцільними коробками, як були: гравцеві байдуже, зі скількох шматків
+     складена стіна, а от прохідність крізь шви була б одразу помітна. */
+  var MS = 2.6;
   function ruinHouse(x, z, rot, w, d, hgt, gaps){
     var y = hAt(x, z);
     var g = new THREE.Group();
@@ -260,20 +264,75 @@ ZONES.field = {
     g.rotation.y = rot;
     root.add(g);
     var t = 0.5;
-    function seg(lx, lz, sw, sd, sh){
-      var m = new THREE.Mesh(new THREE.BoxGeometry(sw, sh, sd), M.wall);
-      m.position.set(lx, sh / 2, lz);
-      m.castShadow = !LOWFX; m.receiveShadow = !LOWFX;
+
+    // розміри підганяємо під сітку модулів, щоб панелі сходились без щілин
+    var nx = Math.max(1, Math.round(w / MS)), nz = Math.max(1, Math.round(d / MS));
+    w = nx * MS; d = nz * MS;
+
+    function panel(lx, lz, ry, lvl, id){
+      var m = model(id, { s: MS });
+      if (!m) return false;
+      m.position.set(lx, lvl * MS, lz);
+      m.rotation.y = ry;
       g.add(m);
-      var c = Math.cos(rot), s2 = Math.sin(rot);
+      return true;
+    }
+    function pick(lvl, top){
+      if (top && rnd() < 0.42) return null;              // верх обвалився
+      if (rnd() < 0.16) return 'house-broken';
+      if (lvl === 0 && rnd() < 0.18) return 'house-window';
+      return 'house-wall';
+    }
+    // стіна вздовж Z (панель уже лежить уздовж Z, повертати не треба)
+    function runZ(lx, lvls, ry){
+      for (var j = 0; j < nz; j++)
+        for (var l = 0; l < lvls; l++) {
+          var id = pick(l, l === lvls - 1);
+          if (id) panel(lx, -d / 2 + MS * (j + 0.5), ry, l, id);
+        }
+    }
+    // стіна вздовж X
+    function runX(lz, lvls, ry, doorAt){
+      for (var i = 0; i < nx; i++)
+        for (var l = 0; l < lvls; l++) {
+          var id = (l === 0 && i === doorAt) ? 'house-door' : pick(l, l === lvls - 1);
+          if (id) panel(-w / 2 + MS * (i + 0.5), lz, ry, l, id);
+        }
+    }
+    var H = Math.max(1, Math.round(hgt / MS));
+    var hL = Math.max(1, Math.round(H * (gaps & 1 ? 0.5 : 1)));
+    var hR = Math.max(1, Math.round(H * (gaps & 2 ? 0.55 : 1)));
+    var hB = Math.max(1, Math.round(H * (gaps & 4 ? 0.45 : 1)));
+    var okMdl = hasModel('house-wall');
+    if (okMdl) {
+      runZ(-w / 2, hL, 0);
+      runZ(w / 2, hR, Math.PI);
+      runX(-d / 2, hB, Math.PI / 2, (nx / 2) | 0);
+      runX(d / 2, H, -Math.PI / 2, -1);
+    } else {
+      // без моделей — старі суцільні стіни
+      function seg(lx, lz, sw, sd, sh){
+        var m = new THREE.Mesh(new THREE.BoxGeometry(sw, sh, sd), M.wall);
+        m.position.set(lx, sh / 2, lz);
+        m.castShadow = !LOWFX; m.receiveShadow = !LOWFX;
+        g.add(m);
+      }
+      seg(-w / 2, 0, t, d, hgt * (gaps & 1 ? 0.45 : 1));
+      seg(w / 2, 0, t, d, hgt * (gaps & 2 ? 0.5 : 1));
+      seg(0, -d / 2, w, t, hgt * (gaps & 4 ? 0.4 : 1));
+      seg(0, d / 2, w, t, hgt);
+    }
+
+    // зіткнення: чотири суцільні стіни незалежно від того, з чого вони зібрані
+    var c = Math.cos(rot), s2 = Math.sin(rot);
+    function wallBox(lx, lz, sw, sd, sh){
       addBox(x + lx * c - lz * s2, z + lx * s2 + lz * c, sw / 2, sd / 2, rot, y + sh);
     }
-    // чотири стіни з проломами
-    seg(-w / 2, 0, t, d, hgt * (gaps & 1 ? 0.45 : 1));
-    seg(w / 2, 0, t, d, hgt * (gaps & 2 ? 0.5 : 1));
-    seg(0, -d / 2, w, t, hgt * (gaps & 4 ? 0.4 : 1));
-    seg(0, d / 2, w * 0.35, t, hgt);
-    seg(w * 0.34, d / 2, w * 0.32, t, hgt * 0.6);
+    wallBox(-w / 2, 0, t, d, hL * MS);
+    wallBox(w / 2, 0, t, d, hR * MS);
+    wallBox(0, -d / 2, w, t, hB * MS);
+    wallBox(0, d / 2, w, t, H * MS);
+
     // уламки даху
     for (var r = 0; r < 4; r++) {
       var beam = new THREE.Mesh(new THREE.BoxGeometry(w * 0.9, 0.22, 0.24), M.wood);
@@ -286,6 +345,13 @@ ZONES.field = {
     fl.position.y = 0.1; fl.receiveShadow = !LOWFX;
     g.add(fl);
     scatterRocks(x, z, Math.max(w, d) * 0.7, 5, 0.25, 0.6);
+    // що лишилось від господарства
+    var pr = ['barrel', 'barrel-open', 'crate', 'bucket', 'planks', 'firewood', 'hay', 'debris-wood'];
+    for (var q = 0; q < 4; q++) {
+      var qa = rnd() * 6.283, qr = Math.max(w, d) * (0.3 + rnd() * 0.3);
+      placeModel(root, pr[(rnd() * pr.length) | 0],
+        x + Math.cos(qa) * qr, z + Math.sin(qa) * qr, { s: rr(2.0, 3.0) });
+    }
   }
 
   /* --- кістяк велетенської риби: головний орієнтир поля --- */

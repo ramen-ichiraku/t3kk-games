@@ -103,8 +103,20 @@ function geo(k, a){ return { __geo: k, a: a }; }
 function buildGeo(g){
   var a = g.a, m;
   switch (g.__geo) {
-    case 'box':
-      return BABYLON.MeshBuilder.CreateBox(__nn('box'), { width: a[0], height: a[1], depth: a[2] }, bscene);
+    case 'box': {
+      // Текстура на коробці розтягується по всій грані, тому мур дев'ять
+      // метрів завдовжки й камінь завбільшки з долоню отримували однакову
+      // кількість малюнка — звідси розмиті смуги на стінах. Задаємо кожній
+      // грані свій діапазон UV, пропорційний її розміру у світі.
+      var bw = a[0], bh = a[1], bd = a[2], U = 2.5;
+      var fuv = [];
+      // порядок граней Babylon: +Z, -Z, +X, -X, +Y, -Y
+      var dims = [[bw, bh], [bw, bh], [bd, bh], [bd, bh], [bw, bd], [bw, bd]];
+      for (var fi = 0; fi < 6; fi++)
+        fuv.push(new BABYLON.Vector4(0, 0, dims[fi][0] / U, dims[fi][1] / U));
+      return BABYLON.MeshBuilder.CreateBox(__nn('box'),
+        { width: bw, height: bh, depth: bd, faceUV: fuv, wrap: true }, bscene);
+    }
     case 'sphere': {
       var o = { diameter: a[0] * 2, segments: Math.max(4, Math.round((a[1] || 12) / 2)) };
       if (a[4] !== undefined) o.slice = a[4] / Math.PI;      // напівсфера для лисини
