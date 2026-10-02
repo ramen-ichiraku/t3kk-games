@@ -229,7 +229,7 @@ ZONES.field = {
         m.castShadow = !LOWFX;
         root.add(m);
       }
-      if (sc > 1.0) addWall(x, z, sc * 0.75, hAt(x, z) + sc * 1.1);
+      solidifyNode(m, x, z);
     }
   }
   var TREES = ['pine-dead', 'pine-crooked', 'pine', 'tree-tall', 'tree'];
@@ -603,7 +603,7 @@ ZONES.field = {
         rm.rotation.set(rr(-0.14, 0.14), rnd() * 6.283, rr(-0.14, 0.14));
         root.add(rm);
       }
-      if (s2 > 1.0) addWall(px, pz, s2 * 0.75, hAt(px, pz) + s2 * 1.15);
+      solidifyNode(rm, px, pz);
     }
 
     // трава купами, а не рівним килимом
@@ -643,11 +643,12 @@ ZONES.field = {
         st.castShadow = !LOWFX;
       }
       root.add(st);
+      solidifyNode(st, ox, oz);
     }
     // склеп і вівтар як орієнтири на цвинтарі
     (function(){
       var cx3 = CHAPEL.x - 17, cz3 = CHAPEL.z - 4;
-      var cr3 = placeModel(root, 'crypt-small', cx3, cz3, { s: 3.0, yaw: 0.4 });
+      var cr3 = placeModel(root, 'crypt-small', cx3, cz3, { s: 3.0, yaw: 0.4, solid: false });
       if (cr3) addBox(cx3, cz3, 2.1, 2.2, 0);
       placeModel(root, 'altar', CHAPEL.x + 15, CHAPEL.z + 9, { s: 2.6, yaw: -0.8 });
       placeModel(root, 'bench-broken', CHAPEL.x + 11, CHAPEL.z + 13, { s: 2.4 });

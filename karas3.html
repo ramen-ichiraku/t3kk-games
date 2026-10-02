@@ -1298,6 +1298,7 @@ function model(id, opt){
     : t.createInstance('i' + (++__mdlN) + ':' + id);
   if (fit && fit.clone) inst.setEnabled(true);
   inst.isPickable = false;
+  inst.__mid = id;                 // щоб потім знати, з чого робити тіло
   var s = o.s === undefined ? 1 : o.s;
   inst.scaling.set(s, s, s);
   inst.receiveShadows = !LOWFX && o.shadow !== false;
@@ -1317,6 +1318,32 @@ function modelAny(ids, opt){
   return model(live[Math.floor(rnd() * live.length)], opt);
 }
 
+/* Дрібниці, крізь які треба ходити вільно: трава, тріски, кістки під ногами.
+   Решта реквізиту має бути твердою. */
+var NO_SOLID = {
+  'grass': 1, 'grass-large': 1, 'grass-patch': 1, 'debris': 1, 'debris-wood': 1,
+  'firewood': 1, 'planks': 1, 'rock-flat': 1, 'grave-debris': 1
+};
+
+/* Робить поставлену модель твердою: радіус береться з її ж габариту, тож
+   зіткнення збігається з тим, що намальовано. Доти кожен надгробок, склеп,
+   паркан і бочка були прозорі — їх просто не існувало для гравця. */
+function solidify(id, m, x, z){
+  if (NO_SOLID[id]) return;
+  var t = MDL[id];
+  if (!t) return;
+  var e = t.getBoundingInfo().boundingBox.extendSize;
+  var sc = m.scaling ? m.scaling.x : 1;
+  // радіус трохи менший за намальоване: впритул до краю краще пройти,
+  // ніж застрягти в щілині між двома тілами
+  var r = Math.max(e.x, e.z) * sc * 0.82;
+  if (r < 0.26) return;                       // зовсім дрібне не чіпаємо
+  addWall(x, z, r, hAt(x, z) + e.y * 2 * sc + 0.3);
+}
+
+/* Те саме для моделі, поставленої вручну: ідентифікатор лежить на самому вузлі. */
+function solidifyNode(m, x, z){ if (m && m.__mid) solidify(m.__mid, m, x, z); }
+
 /* Ставить модель на землю в точці (x,z). Повертає вузол або null. */
 function placeModel(root, id, x, z, o){
   var m = model(id, o);
@@ -1327,6 +1354,7 @@ function placeModel(root, id, x, z, o){
   if (o.tilt) { m.rotation.x = o.tilt; m.rotation.z = o.tilt2 || 0; }
   if (o.sy !== undefined) m.scaling.y = m.scaling.y * o.sy;
   root.add(m);
+  if (o.solid !== false) solidify(id, m, x, z);
   return m;
 }
 /* ================= матеріали ================= */
@@ -1915,7 +1943,7 @@ ZONES.field = {
         m.castShadow = !LOWFX;
         root.add(m);
       }
-      if (sc > 1.0) addWall(x, z, sc * 0.75, hAt(x, z) + sc * 1.1);
+      solidifyNode(m, x, z);
     }
   }
   var TREES = ['pine-dead', 'pine-crooked', 'pine', 'tree-tall', 'tree'];
@@ -2289,7 +2317,7 @@ ZONES.field = {
         rm.rotation.set(rr(-0.14, 0.14), rnd() * 6.283, rr(-0.14, 0.14));
         root.add(rm);
       }
-      if (s2 > 1.0) addWall(px, pz, s2 * 0.75, hAt(px, pz) + s2 * 1.15);
+      solidifyNode(rm, px, pz);
     }
 
     // трава купами, а не рівним килимом
@@ -2329,11 +2357,12 @@ ZONES.field = {
         st.castShadow = !LOWFX;
       }
       root.add(st);
+      solidifyNode(st, ox, oz);
     }
     // склеп і вівтар як орієнтири на цвинтарі
     (function(){
       var cx3 = CHAPEL.x - 17, cz3 = CHAPEL.z - 4;
-      var cr3 = placeModel(root, 'crypt-small', cx3, cz3, { s: 3.0, yaw: 0.4 });
+      var cr3 = placeModel(root, 'crypt-small', cx3, cz3, { s: 3.0, yaw: 0.4, solid: false });
       if (cr3) addBox(cx3, cz3, 2.1, 2.2, 0);
       placeModel(root, 'altar', CHAPEL.x + 15, CHAPEL.z + 9, { s: 2.6, yaw: -0.8 });
       placeModel(root, 'bench-broken', CHAPEL.x + 11, CHAPEL.z + 13, { s: 2.4 });
@@ -4334,6 +4363,21 @@ window.__K3 = { P: P, G: G, foes: foes, getBoss: function(){ return boss; }, key
   tp: function(x, z){ P.x = x; P.z = z; P.y = hAt(x, z); },
   ready: function(){ return !!G.ready; },
   free: function(x, z){ return !blocked(x, z, hAt(x, z) + 1.2, 0.5); },
+  obstacles: function(){ return { кіл: walls.length, коробок: boxes.length }; },
+  probe: function(){
+    // по одному представнику кількох видів реквізиту — для перевірки твердості
+    var out = [], seen = {};
+    for (var i = 0; i < scene.__b.meshes.length && out.length < 6; i++) {
+      var m = scene.__b.meshes[i];
+      if (!m.__mid || seen[m.__mid] || m.name.indexOf("mdl:") === 0) continue;
+      if (/grass|debris|hero/.test(m.__mid)) continue;
+      var p = m.getAbsolutePosition();
+      if (Math.hypot(p.x, p.z) > 110) continue;
+      seen[m.__mid] = 1;
+      out.push({ id: m.__mid, x: p.x, z: p.z });
+    }
+    return out;
+  },
   models: function(){ return { ok: MODELS_OK, total: MODEL_IDS.length }; } };
 })();
 </script>

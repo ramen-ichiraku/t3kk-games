@@ -209,4 +209,19 @@ window.__K3 = { P: P, G: G, foes: foes, getBoss: function(){ return boss; }, key
   tp: function(x, z){ P.x = x; P.z = z; P.y = hAt(x, z); },
   ready: function(){ return !!G.ready; },
   free: function(x, z){ return !blocked(x, z, hAt(x, z) + 1.2, 0.5); },
+  obstacles: function(){ return { кіл: walls.length, коробок: boxes.length }; },
+  probe: function(){
+    // по одному представнику кількох видів реквізиту — для перевірки твердості
+    var out = [], seen = {};
+    for (var i = 0; i < scene.__b.meshes.length && out.length < 6; i++) {
+      var m = scene.__b.meshes[i];
+      if (!m.__mid || seen[m.__mid] || m.name.indexOf("mdl:") === 0) continue;
+      if (/grass|debris|hero/.test(m.__mid)) continue;
+      var p = m.getAbsolutePosition();
+      if (Math.hypot(p.x, p.z) > 110) continue;
+      seen[m.__mid] = 1;
+      out.push({ id: m.__mid, x: p.x, z: p.z });
+    }
+    return out;
+  },
   models: function(){ return { ok: MODELS_OK, total: MODEL_IDS.length }; } };

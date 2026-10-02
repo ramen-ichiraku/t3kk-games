@@ -269,6 +269,7 @@ function model(id, opt){
     : t.createInstance('i' + (++__mdlN) + ':' + id);
   if (fit && fit.clone) inst.setEnabled(true);
   inst.isPickable = false;
+  inst.__mid = id;                 // щоб потім знати, з чого робити тіло
   var s = o.s === undefined ? 1 : o.s;
   inst.scaling.set(s, s, s);
   inst.receiveShadows = !LOWFX && o.shadow !== false;
@@ -288,6 +289,32 @@ function modelAny(ids, opt){
   return model(live[Math.floor(rnd() * live.length)], opt);
 }
 
+/* Дрібниці, крізь які треба ходити вільно: трава, тріски, кістки під ногами.
+   Решта реквізиту має бути твердою. */
+var NO_SOLID = {
+  'grass': 1, 'grass-large': 1, 'grass-patch': 1, 'debris': 1, 'debris-wood': 1,
+  'firewood': 1, 'planks': 1, 'rock-flat': 1, 'grave-debris': 1
+};
+
+/* Робить поставлену модель твердою: радіус береться з її ж габариту, тож
+   зіткнення збігається з тим, що намальовано. Доти кожен надгробок, склеп,
+   паркан і бочка були прозорі — їх просто не існувало для гравця. */
+function solidify(id, m, x, z){
+  if (NO_SOLID[id]) return;
+  var t = MDL[id];
+  if (!t) return;
+  var e = t.getBoundingInfo().boundingBox.extendSize;
+  var sc = m.scaling ? m.scaling.x : 1;
+  // радіус трохи менший за намальоване: впритул до краю краще пройти,
+  // ніж застрягти в щілині між двома тілами
+  var r = Math.max(e.x, e.z) * sc * 0.82;
+  if (r < 0.26) return;                       // зовсім дрібне не чіпаємо
+  addWall(x, z, r, hAt(x, z) + e.y * 2 * sc + 0.3);
+}
+
+/* Те саме для моделі, поставленої вручну: ідентифікатор лежить на самому вузлі. */
+function solidifyNode(m, x, z){ if (m && m.__mid) solidify(m.__mid, m, x, z); }
+
 /* Ставить модель на землю в точці (x,z). Повертає вузол або null. */
 function placeModel(root, id, x, z, o){
   var m = model(id, o);
@@ -298,5 +325,6 @@ function placeModel(root, id, x, z, o){
   if (o.tilt) { m.rotation.x = o.tilt; m.rotation.z = o.tilt2 || 0; }
   if (o.sy !== undefined) m.scaling.y = m.scaling.y * o.sy;
   root.add(m);
+  if (o.solid !== false) solidify(id, m, x, z);
   return m;
 }
