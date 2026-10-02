@@ -414,23 +414,41 @@ ZONES.field = {
       var a = i / 8 * 6.283;
       var x = cx + Math.cos(a) * 6.4, z = cz + Math.sin(a) * 6.4;
       var y = hAt(x, z), h = 3.4 + rnd() * 1.6;
-      var st = new THREE.Mesh(new THREE.BoxGeometry(1.3, h, 0.8), M.stoneL);
-      st.position.set(x, y + h / 2, z);
-      st.rotation.set(rr(-0.06, 0.06), a + rr(-0.2, 0.2), rr(-0.07, 0.07));
-      st.castShadow = !LOWFX;
+      // стояки дольмена — замкові стовпи, поставлені по колу
+      // саме цвинтарний стовп, а не замковий: у замкового розфарбування
+      // в червону смужку, і прадавній камінь із нього не виходить
+      var st = model('pillar-square', { s: h / 1.15 });
+      if (st) {
+        st.position.set(x, y, z);
+        st.rotation.set(rr(-0.05, 0.05), a + rr(-0.2, 0.2), rr(-0.06, 0.06));
+      } else {
+        st = new THREE.Mesh(new THREE.BoxGeometry(1.3, h, 0.8), M.stoneL);
+        st.position.set(x, y + h / 2, z);
+        st.rotation.set(rr(-0.06, 0.06), a + rr(-0.2, 0.2), rr(-0.07, 0.07));
+        st.castShadow = !LOWFX;
+      }
       root.add(st);
       addWall(x, z, 0.75, y + h);
       if (i % 3 === 0) {
-        var lin = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.7, 1.0), M.stone);
-        lin.position.set(cx + Math.cos(a + 0.4) * 6.4, y + h + 0.3, cz + Math.sin(a + 0.4) * 6.4);
-        lin.rotation.y = a + 1.2;
+        var lin = model('wall-stone', { s: 3.2 });
+        if (!lin) {
+          lin = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.7, 1.0), M.stone);
+          lin.position.set(cx + Math.cos(a + 0.4) * 6.4, y + h + 0.3, cz + Math.sin(a + 0.4) * 6.4);
+          lin.rotation.y = a + 1.2;
+        } else {
+          lin.position.set(cx + Math.cos(a + 0.4) * 6.4, y + h - 0.1, cz + Math.sin(a + 0.4) * 6.4);
+          lin.rotation.set(0, a + 1.2, 0);
+        }
         root.add(lin);
       }
     }
     var oy = hAt(cx, cz);
-    var alt = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.9, 0.7, 10), M.stoneD);
-    alt.position.set(cx, oy + 0.35, cz);
-    root.add(alt);
+    var alt = placeModel(root, 'altar', cx, cz, { s: 3.4, yaw: 0.3, solid: false });
+    if (!alt) {
+      alt = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.9, 0.7, 10), M.stoneD);
+      alt.position.set(cx, oy + 0.35, cz);
+      root.add(alt);
+    }
     addWall(cx, cz, 1.7, oy + 0.9);
     scatterRocks(cx, cz, 10, 8, 0.3, 0.8);
   })();
@@ -441,21 +459,43 @@ ZONES.field = {
     var g = new THREE.Group();
     g.position.set(tx, ty, tz);
     root.add(g);
-    var body = new THREE.Mesh(new THREE.CylinderGeometry(3.1, 3.8, 15, 12), M.stoneL);
-    body.position.y = 7.5; body.castShadow = !LOWFX;
-    g.add(body);
-    // обвалений верх
-    for (var i = 0; i < 9; i++) {
-      var a = i / 9 * 6.283;
-      var h = 1.2 + rnd() * 2.4;
-      var cr = new THREE.Mesh(new THREE.BoxGeometry(1.5, h, 1.0), M.stone);
-      cr.position.set(Math.cos(a) * 3.0, 15 + h / 2, Math.sin(a) * 3.0);
-      cr.rotation.y = a;
-      g.add(cr);
+    // Вежа збирається кільцем цегляних модулів цвинтарного набору. Замкові
+    // яруси сюди не годяться: вони в червону смужку й читаються як маяк.
+    var built = false;
+    (function(){
+      if (!hasModel('brick-wall')) return;
+      var MW = 3.0, LV = 2.2;            // модуль у метрах і висота ярусу
+      var R = 3.2, N = 6;                // радіус кільця й скільки модулів у ньому
+      for (var L = 0; L < 5; L++) {
+        for (var i = 0; i < N; i++) {
+          // верхні яруси обвалені: що вище, то більше пропусків
+          if (L >= 3 && rnd() < 0.25 + (L - 3) * 0.3) continue;
+          var a2 = i / N * 6.283 + L * 0.12;
+          var w = model(rnd() < 0.3 ? 'wall-broken' : 'brick-wall', { s: MW });
+          if (!w) return;
+          w.position.set(Math.cos(a2) * R, L * LV, Math.sin(a2) * R);
+          w.rotation.y = -a2 + Math.PI / 2;
+          g.add(w);
+        }
+      }
+      // кутові стовпи тримають силует, коли стіна обвалилась
+      for (var k = 0; k < 3; k++) {
+        var a3 = k / 3 * 6.283 + 0.5;
+        var p2 = model('pillar-square', { s: 9.0 });
+        if (!p2) break;
+        p2.position.set(Math.cos(a3) * (R + 0.4), 0, Math.sin(a3) * (R + 0.4));
+        g.add(p2);
+      }
+      built = true;
+    })();
+    if (!built) {
+      var body = new THREE.Mesh(new THREE.CylinderGeometry(3.1, 3.8, 15, 12), M.stoneL);
+      body.position.y = 7.5; body.castShadow = !LOWFX;
+      g.add(body);
+      var door = new THREE.Mesh(new THREE.BoxGeometry(2.0, 3.2, 0.6), M.dark);
+      door.position.set(0, 1.6, 3.7);
+      g.add(door);
     }
-    var door = new THREE.Mesh(new THREE.BoxGeometry(2.0, 3.2, 0.6), M.dark);
-    door.position.set(0, 1.6, 3.7);
-    g.add(door);
     addWall(tx, tz, 3.4, ty + 17);
     scatterRocks(tx, tz, 12, 12, 0.4, 1.3);
     for (var d = 0; d < 3; d++) deadTree(tx + rr(-11, 11), tz + rr(-11, 11), 5 + rnd() * 3);
@@ -687,7 +727,8 @@ ZONES.field = {
         var x = GX + sd * (7.6 + rnd() * 1.6);
         var y = hAt(x, z);
         var hgt = 6 + rnd() * 7;
-        var m = new THREE.Mesh(new THREE.DodecahedronGeometry(2.4 + rnd() * 1.8, 0), M.stoneD);
+        var m = modelAny(['boulder', 'boulder-small', 'rocks-tall'], { s: (2.4 + rnd() * 1.8) * 2.2 });
+      if (!m) m = new THREE.Mesh(new THREE.DodecahedronGeometry(2.4 + rnd() * 1.8, 0), M.stoneD);
         m.position.set(x, y + hgt * 0.28, z);
         m.scale.set(1, hgt * 0.34, 1);
         m.rotation.set(rnd() * 0.5, rnd() * 3, rnd() * 0.5);

@@ -20,6 +20,9 @@ var MODEL_DIR = {
 
 /* Згенеровані деталі персонажів. Лежать окремо: у них нема спільної
    текстури, і правила до них інші — їх ріжемо й робимо гранованими. */
+MODEL_DIR['ca'] = ['bridge', 'bridge-pillar', 'tower-base', 'tower-mid', 'tower-mid-win',
+  'tower-top', 'tower-arch', 'castle-wall', 'castle-wall-half', 'castle-corner',
+  'castle-doorway', 'castle-pillar', 'stairs-stone', 'boulder', 'boulder-small', 'gate'];
 MODEL_DIR['chars'] = ['karas-head', 'karas-body', 'karas-hero'];
 
 /* Генератор 3D навчений на цілих предметах і вперто ліпить цілу істоту:

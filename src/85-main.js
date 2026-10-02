@@ -210,6 +210,7 @@ window.__K3 = { P: P, G: G, foes: foes, getBoss: function(){ return boss; }, key
   ready: function(){ return !!G.ready; },
   free: function(x, z){ return !blocked(x, z, hAt(x, z) + 1.2, 0.5); },
   obstacles: function(){ return { кіл: walls.length, коробок: boxes.length }; },
+  lists: function(){ return { walls: walls, boxes: boxes }; },
   probe: function(){
     // по одному представнику кількох видів реквізиту — для перевірки твердості
     var out = [], seen = {};
