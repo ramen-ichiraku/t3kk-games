@@ -178,6 +178,22 @@ function watch(dir){
   });
 }
 
+/* Стенд має пережити будь-яку помилку: він потрібен увесь час, поки йде
+   робота, і падати через збій у стеженні за файлами чи в розірваному
+   з'єднанні він не має права. */
+function survive(e){
+  console.log('\nстенд спіткнувся, але працює далі: ' + (e && e.message ? e.message : e));
+}
+process.on('uncaughtException', survive);
+process.on('unhandledRejection', survive);
+srv.on('error', e => {
+  if (e && e.code === 'EADDRINUSE') {
+    console.log('порт ' + PORT + ' уже зайнятий — мабуть, стенд уже працює в іншому вікні.');
+    process.exit(1);
+  }
+  console.log('помилка сервера: ' + e.message);
+});
+
 srv.listen(PORT, '127.0.0.1', () => {
   const base = 'http://127.0.0.1:' + PORT;
   console.log('стенд працює:');
